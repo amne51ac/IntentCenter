@@ -1,8 +1,8 @@
 # IntentCenter — network automation & DCIM platform
 
-**Project:** IntentCenter · **Repository:** [github.com/amne51ac/IntentCenter](https://github.com/amne51ac/IntentCenter) · **[README on GitHub](https://github.com/amne51ac/IntentCenter/blob/main/README.md)**
+**Project:** IntentCenter · **Repository:** [github.com/amne51ac/intentcenter](https://github.com/amne51ac/intentcenter) · **[README on GitHub](https://github.com/amne51ac/intentcenter/blob/main/README.md)**
 
-**Documentation website (GitHub Pages):** after enabling Pages from the `/docs` folder on `main`, the static site is served at **[https://amne51ac.github.io/IntentCenter/](https://amne51ac.github.io/IntentCenter/)** — landing page, full doc hub, architecture (Mermaid), roadmap, platform API summary, LLM design, clean-room index, and brand guide. See [`docs/PUBLISHING.md`](docs/PUBLISHING.md#github-pages).
+**Documentation website (GitHub Pages):** after enabling Pages from the `/docs` folder on `main`, the static site is served at **[https://amne51ac.github.io/intentcenter/](https://amne51ac.github.io/intentcenter/)** — landing page, console-aligned styling, screenshots, full doc hub, architecture (Mermaid), roadmap, platform API summary, LLM design, clean-room index, and brand guide. See [`docs/README.md`](docs/README.md).
 
 This repository captures **clean-room research** and a **product roadmap** for IntentCenter: a new **network source of truth**, **DCIM**, and **network automation** platform aimed at **provider and distributor scale**: ISPs, backbone operators, hyperscale-adjacent network teams, and large infrastructure organizations that need **throughput**, **resilience**, and **operational maturity**—not lab-sized tooling.
 
@@ -284,12 +284,13 @@ flowchart LR
 ```
 .github/workflows/  # platform-ci.yml — lint, typecheck, web build, pytest (see Tests & CI)
 cleanroom/            # Clean-room capability & design research (Source A–H, AS1)
-docs/                 # Architecture visuals, publishing notes, GitHub Pages static site
-  index.html          # Landing (IntentCenter brand)
+docs/                 # Architecture visuals, GitHub Pages static site (console-aligned CSS + screenshots)
+  index.html          # Landing (brand + product screenshots)
   documentation.html  # Doc hub + links to Markdown sources on GitHub
-  assets/             # site.css, intentcenter-logo.svg, favicon.svg
+  assets/             # site.css, logos, favicon, assets/screenshots/*.png
   architecture.md     # Extended Mermaid diagrams (authoritative alongside architecture.html)
-  PUBLISHING.md       # Git / GitHub CLI / GitHub Pages steps
+  README.md           # Docs folder index (Pages + custom domain notes)
+  .nojekyll           # Serve static HTML without Jekyll
 platform/             # Phase 1 implementation (schema, Python API, React console)
   README.md           # Short platform + web UI notes (see root README for full runbook)
   prisma/             # Schema & migrations (Prisma); PostgreSQL is the datastore
@@ -357,7 +358,7 @@ This project is licensed under the **GNU Affero General Public License v3.0** (A
 ## Clone & contribute
 
 ```bash
-git clone https://github.com/amne51ac/IntentCenter.git
+git clone https://github.com/amne51ac/intentcenter.git
 ```
 
-Additional **init / remote** notes (if you fork or mirror) remain in [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+GitHub Pages and publishing notes are summarized in [`docs/README.md`](docs/README.md).

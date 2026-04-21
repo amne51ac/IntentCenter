@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IntentCenter REST API — OpenAPI, authentication, v1 endpoints, GraphQL." />
+  <title>REST &amp; OpenAPI — IntentCenter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+  <link rel="stylesheet" href="assets/docs-layout.css" />
+</head>
+<body class="docs-page" data-docs-page="api">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="200" height="40" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="documentation.html">Docs</a>
+        <a href="https://github.com/amne51ac/intentcenter">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="docs-shell">
+    <aside id="docs-sidebar" class="docs-sidebar" aria-label="Section navigation"></aside>
+    <main class="docs-main docs-prose">
+      <h1>REST API &amp; OpenAPI</h1>
+      <p>
+        The Phase&nbsp;1 API is served by FastAPI. Interactive docs are available from a running instance; this page
+        summarizes versioned surfaces and how to authenticate.
+      </p>
+
+      <div class="docs-callout">
+        <strong>Machine-readable spec.</strong> With the API running (default <code>http://localhost:8080</code>),
+        fetch OpenAPI JSON at <code>GET /docs/json</code> and Swagger UI at <code>GET /docs</code>.
+      </div>
+
+      <h2 id="auth">Authentication</h2>
+      <p>
+        Interactive users sign in via the web UI; automation uses <strong>Bearer tokens</strong> (seeded API tokens or
+        issued tokens). Send:
+      </p>
+      <pre><code>Authorization: Bearer &lt;token&gt;</code></pre>
+      <p>Example:</p>
+      <pre><code class="language-bash">curl -sS -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/me</code></pre>
+
+      <h2 id="surfaces">API surfaces</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Surface</th>
+            <th>Path</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>OpenAPI JSON</td>
+            <td><code>GET /docs/json</code></td>
+            <td>Full schema for codegen &amp; contract tests</td>
+          </tr>
+          <tr>
+            <td>Swagger UI</td>
+            <td><code>GET /docs</code></td>
+            <td>Try requests against a live server</td>
+          </tr>
+          <tr>
+            <td>GraphQL (read)</td>
+            <td><code>POST /graphql</code></td>
+            <td>GraphiQL at <code>GET /graphql</code> when enabled</td>
+          </tr>
+          <tr>
+            <td>REST v1</td>
+            <td><code>/v1/…</code></td>
+            <td>Inventory, bulk, resource views, search</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="v1-ui">Endpoints used by the web UI</h2>
+      <p>These are stable touchpoints for the React console (see also <a href="platform.html">Platform &amp; web UI</a>).</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th>Method &amp; path</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Global search</td><td><code>GET /v1/search?q=&amp;limit=</code></td></tr>
+          <tr><td>Current user / prefs</td><td><code>GET /v1/me</code>, <code>PATCH /v1/me</code></td></tr>
+          <tr><td>Object view (fields + graph)</td><td><code>GET /v1/resource-view/{resourceType}/{id}</code></td></tr>
+          <tr><td>Relationship graph JSON</td><td><code>GET /v1/resource-graph/{resourceType}/{id}</code></td></tr>
+          <tr><td>Bulk export</td><td><code>GET /v1/bulk/{resourceType}/export</code></td></tr>
+          <tr><td>Bulk import</td><td><code>POST /v1/bulk/{resourceType}/import/csv</code>, <code>…/import/json</code></td></tr>
+        </tbody>
+      </table>
+      <p>
+        Supported bulk <code>resourceType</code> values include core types such as <code>Location</code>, <code>Rack</code>,
+        <code>Device</code>, <code>Vrf</code>, plus catalog types registered in the bulk router. Refer to
+        <code>platform/backend/nims/routers/v1/bulk.py</code> in the repo for the authoritative list.
+      </p>
+
+      <h2 id="errors">Errors &amp; versioning</h2>
+      <p>
+        Errors follow HTTP semantics with JSON bodies from FastAPI. API paths are versioned under <code>/v1</code>; bump
+        major versions when breaking contracts. Use <code>correlationId</code> headers where returned for tracing across
+        jobs and webhooks.
+      </p>
+
+      <p style="margin-top: 40px">
+        <a href="documentation.html">← Documentation home</a>
+      </p>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter · <a href="https://github.com/amne51ac/intentcenter">Source</a> ·
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0</a>
+    </p>
+  </footer>
+  <script src="assets/docs-nav.js" defer></script>
+</body>
+</html>

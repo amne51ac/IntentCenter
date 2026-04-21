@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { apiJson, logout } from "../api/client";
 import { CollapsibleNavSection } from "../components/CollapsibleNavSection";
 import { GlobalSearch } from "../components/GlobalSearch";
+import { publicAssetUrl } from "../lib/publicAssetUrl";
 import { SIDEBAR_NAV, navItemToPath, type SidebarNavItem } from "../nav/sidebarNav";
 
 function SidebarNavLink({ item }: { item: SidebarNavItem }) {
@@ -61,7 +62,7 @@ export function AppShell() {
         <div className="sidebar-brand">
           <NavLink to="/" end className="sidebar-brand-link" title="IntentCenter — Overview">
             <img
-              src="/intentcenter-logo.svg"
+              src={publicAssetUrl("intentcenter-logo.svg")}
               alt="IntentCenter"
               className="sidebar-wordmark"
               width={200}

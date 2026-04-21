@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiJson } from "../api/client";
+import { publicAssetUrl } from "../lib/publicAssetUrl";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export function LoginPage() {
       <div className="login-panel">
         <div className="login-brand">
           <img
-            src="/intentcenter-logo.svg"
+            src={publicAssetUrl("intentcenter-logo.svg")}
             alt="IntentCenter"
             className="login-wordmark"
             width={280}
