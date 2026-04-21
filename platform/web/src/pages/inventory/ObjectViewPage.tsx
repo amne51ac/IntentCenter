@@ -4,6 +4,7 @@ import { useId, useMemo } from "react";
 import { apiJson } from "../../api/client";
 import { InlineLoader } from "../../components/Loader";
 import { objectEditHref, objectViewHref, resourceTypeForApi } from "../../lib/objectLinks";
+import { LocationMap, rowToMapPoint } from "../../components/LocationMap";
 
 type Node = { resourceType: string; id: string; label: string; meta?: Record<string, unknown> };
 type Edge = {
@@ -719,8 +720,9 @@ export function ObjectViewPage() {
                 {Object.keys(q.data.item)
                   .filter(
                     (key) =>
-                      rtApi !== "Circuit" ||
-                      (key !== "segments" && key !== "terminations" && key !== "circuitDiversityGroup"),
+                      (rtApi !== "Circuit" ||
+                        (key !== "segments" && key !== "terminations" && key !== "circuitDiversityGroup")) &&
+                      (rtApi !== "Location" || (key !== "latitude" && key !== "longitude")),
                   )
                   .sort()
                   .map((key) => (
@@ -731,6 +733,27 @@ export function ObjectViewPage() {
                   ))}
               </dl>
             </section>
+
+            {rtApi === "Location" ? (
+              <section className="graph-section">
+                <h3 className="graph-section-title">Map</h3>
+                {(() => {
+                  const item = q.data.item;
+                  const name = typeof item.name === "string" ? item.name : "Location";
+                  const pt = rowToMapPoint({
+                    id,
+                    name,
+                    latitude: item.latitude as number | null | undefined,
+                    longitude: item.longitude as number | null | undefined,
+                  });
+                  return pt ? (
+                    <LocationMap key={id} points={[pt]} height={320} highlightId={id} />
+                  ) : (
+                    <p className="muted">No coordinates for this location. Use Edit to set latitude and longitude.</p>
+                  );
+                })()}
+              </section>
+            ) : null}
 
             {rtApi === "Circuit" ? <CircuitTopologySection item={q.data.item} /> : null}
 

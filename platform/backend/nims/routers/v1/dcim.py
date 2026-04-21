@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -12,8 +12,8 @@ from nims.deps import get_auth, get_db, require_auth_ctx
 from nims.models_generated import (
     Cable,
     Device,
-    Devicestatus,
     DeviceRole,
+    Devicestatus,
     DeviceType,
     Interface,
     Location,
@@ -53,8 +53,16 @@ class LocationCreate(BaseModel):
     locationTypeId: uuid.UUID
     parentId: uuid.UUID | None = None
     description: str | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     templateId: uuid.UUID | None = None
     customAttributes: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def lat_lon_both_or_neither(self) -> "LocationCreate":
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must both be set or both omitted")
+        return self
 
 
 class LocationUpdate(BaseModel):
@@ -63,6 +71,8 @@ class LocationUpdate(BaseModel):
     locationTypeId: uuid.UUID | None = None
     parentId: uuid.UUID | None = None
     description: str | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     templateId: uuid.UUID | None = None
     customAttributes: dict[str, Any] | None = None
 
@@ -292,6 +302,8 @@ def create_location(
         locationTypeId=body.locationTypeId,
         parentId=body.parentId,
         description=body.description,
+        latitude=body.latitude,
+        longitude=body.longitude,
         createdAt=now,
         updatedAt=now,
     )
@@ -399,6 +411,21 @@ def update_location(
         loc.parentId = raw["parentId"]
     if "description" in raw:
         loc.description = raw["description"]
+    if "latitude" in raw or "longitude" in raw:
+        if "latitude" not in raw or "longitude" not in raw:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="latitude and longitude must be updated together",
+            )
+        la = raw["latitude"]
+        lo = raw["longitude"]
+        if (la is None) != (lo is None):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="latitude and longitude must both be set or both cleared",
+            )
+        loc.latitude = la
+        loc.longitude = lo
     loc.updatedAt = utc_now()
     _apply_extension_patch(db, ctx.organization.id, "Location", location_id, body)
     record_audit(

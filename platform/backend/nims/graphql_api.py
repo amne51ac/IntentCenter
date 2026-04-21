@@ -25,6 +25,8 @@ class GqlLocation:
     name: str
     slug: str
     parentId: strawberry.ID | None
+    latitude: float | None
+    longitude: float | None
 
 
 @strawberry.type
@@ -93,6 +95,8 @@ class Query:
                 name=r.name,
                 slug=r.slug,
                 parentId=str(r.parentId) if r.parentId else None,
+                latitude=r.latitude,
+                longitude=r.longitude,
             )
             for r in rows
         ]

@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiJson } from "../../api/client";
 import { DataTable } from "../../components/DataTable";
 import { ModelListPageHeader } from "../../components/ModelListPageHeader";
 import { RowOverflowMenu } from "../../components/RowOverflowMenu";
 import { objectEditHref, objectViewHref } from "../../lib/objectLinks";
+import { LocationMap, rowToMapPoint, type LocationMapPoint } from "../../components/LocationMap";
 import type { LocationRow } from "./LocationFormPage";
 import { InlineLoader } from "../../components/Loader";
 
@@ -19,6 +21,8 @@ async function duplicateLocation(id: string): Promise<string> {
       locationTypeId: item.locationType.id,
       parentId: item.parent?.id ?? null,
       description: item.description ?? null,
+      latitude: item.latitude ?? null,
+      longitude: item.longitude ?? null,
       templateId: item.templateId ?? null,
       customAttributes: item.customAttributes ?? {},
     }),
@@ -50,6 +54,16 @@ export function LocationsPage() {
   const err =
     q.error || deleteMut.error || dupMut.error ? String(q.error || deleteMut.error || dupMut.error) : null;
 
+  const mapPoints = useMemo((): LocationMapPoint[] => {
+    if (!q.data?.items?.length) return [];
+    const out: LocationMapPoint[] = [];
+    for (const row of q.data.items) {
+      const p = rowToMapPoint(row);
+      if (p) out.push(p);
+    }
+    return out;
+  }, [q.data?.items]);
+
   function confirmArchive() {
     return window.confirm(
       "Archive this location? It will be removed from the active list. Child locations or racks must be moved first.",
@@ -74,6 +88,16 @@ export function LocationsPage() {
       <div className="main-body">
         {q.isLoading ? <InlineLoader /> : null}
         {err ? <div className="error-banner">{err}</div> : null}
+        {q.data ? (
+          <section className="graph-section locations-page-map">
+            <h3 className="graph-section-title">Map</h3>
+            <LocationMap
+              points={mapPoints}
+              height={380}
+              emptyMessage="No locations have coordinates yet. Edit a location to set latitude and longitude."
+            />
+          </section>
+        ) : null}
         {q.data ? (
           <DataTable
             columns={[

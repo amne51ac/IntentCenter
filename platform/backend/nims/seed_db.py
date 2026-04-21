@@ -253,11 +253,17 @@ def _ensure_demo_extended_graph(session: Session, org: Organization, now) -> Non
             locationTypeId=lt_site_row.id,
             name="East carrier POP",
             slug="pop-east",
+            latitude=40.7128,
+            longitude=-74.006,
             updatedAt=now,
             deletedAt=None,
         )
         session.add(loc_pop)
         session.flush()
+    elif loc_pop is not None and loc_pop.latitude is None:
+        loc_pop.latitude = 40.7128
+        loc_pop.longitude = -74.006
+        loc_pop.updatedAt = now
 
     prov_wholesale = session.execute(
         select(Provider).where(Provider.organizationId == org.id, Provider.name == "Wholesale Transport", Provider.deletedAt.is_(None)),
@@ -546,11 +552,17 @@ def run_seed(session: Session) -> tuple[Organization, str, str, str, str]:
             locationTypeId=lt_site.id,
             name="Headquarters",
             slug="hq",
+            latitude=37.7749,
+            longitude=-122.4194,
             updatedAt=now,
             deletedAt=None,
         )
         session.add(loc)
         session.flush()
+    elif loc.latitude is None:
+        loc.latitude = 37.7749
+        loc.longitude = -122.4194
+        loc.updatedAt = now
 
     rack = session.execute(
         select(Rack).where(

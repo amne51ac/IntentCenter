@@ -29,14 +29,6 @@
       title: "Data model",
       items: [{ id: "data-model", href: "data-model.html", label: "Schema reference" }],
     },
-    {
-      title: "Research & design",
-      items: [
-        { id: "cleanroom", href: "cleanroom.html", label: "Clean-room research" },
-        { id: "llm-assistant", href: "llm-assistant.html", label: "LLM assistant (design)" },
-        { id: "brand", href: "brand.html", label: "Brand guide" },
-      ],
-    },
   ];
 
   function currentId() {

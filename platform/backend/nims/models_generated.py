@@ -3,7 +3,7 @@ import datetime
 import enum
 import uuid
 
-from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, Text, Uuid, text
+from sqlalchemy import ARRAY, Boolean, DateTime, Enum, Float, ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, Text, Uuid, text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -554,6 +554,8 @@ class Location(Base):
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
     parentId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     description: Mapped[Optional[str]] = mapped_column(Text)
+    latitude: Mapped[Optional[float]] = mapped_column(Float)
+    longitude: Mapped[Optional[float]] = mapped_column(Float)
     deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
 
     LocationType_: Mapped['LocationType'] = relationship('LocationType', back_populates='Location')

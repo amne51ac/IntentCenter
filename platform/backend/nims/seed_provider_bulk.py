@@ -624,6 +624,9 @@ def run_bulk_seed(session: Session, *, purge: bool) -> dict[str, object]:
             site_codes.append(code)
             # Slug must be unique per org: monotonic index first (never reuse patterns like pop-{iata}-mmr-{n}).
             site_slug = f"pb-{gidx:06d}-{iata.lower()}"
+            # Deterministic spread for map demos (continental US–ish grid)
+            site_lat = 28.0 + (gidx % 180) * 0.08
+            site_lon = -124.0 + (gidx % 220) * 0.06
             gidx += 1
             site_rows.append(
                 {
@@ -634,6 +637,8 @@ def run_bulk_seed(session: Session, *, purge: bool) -> dict[str, object]:
                     "name": f"POP {iata.upper()}-MMR-{gidx - 1:05d}",
                     "slug": site_slug,
                     "description": "Meet-me room / backbone POP",
+                    "latitude": site_lat,
+                    "longitude": site_lon,
                     "createdAt": now,
                     "updatedAt": now,
                     "deletedAt": None,

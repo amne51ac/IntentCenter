@@ -810,6 +810,34 @@ tr.data-row-clickable:hover td {
   font-family: var(--font-sans);
 }
 
+.location-coords-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.location-coords-heading {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0.25rem 0 0;
+}
+
+.location-coords-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .location-coords-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.locations-page-map {
+  margin-bottom: 1.25rem;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

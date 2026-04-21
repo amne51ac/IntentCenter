@@ -16,8 +16,8 @@ from nims.auth_context import AuthContext, auth_actor_from_context, require_writ
 from nims.crypto_util import new_correlation_id
 from nims.deps import get_auth, get_db, require_auth_ctx
 from nims.models_generated import (
-    Devicestatus,
     Device,
+    Devicestatus,
     Location,
     Rack,
     Vrf,
@@ -244,6 +244,17 @@ def bulk_import_json(
                 parent = row.get("parentId")
                 parent_id = uuid.UUID(str(parent)) if parent else None
                 desc = row.get("description")
+
+                def _opt_float(key: str) -> float | None:
+                    v = row.get(key)
+                    if v is None or v == "":
+                        return None
+                    return float(v)
+
+                lat = _opt_float("latitude")
+                lon = _opt_float("longitude")
+                if (lat is None) != (lon is None):
+                    raise ValueError("latitude and longitude must both be set or both omitted")
                 loc = Location(
                     id=uuid.uuid4(),
                     organizationId=oid,
@@ -252,6 +263,8 @@ def bulk_import_json(
                     locationTypeId=lt,
                     parentId=parent_id,
                     description=str(desc) if desc else None,
+                    latitude=lat,
+                    longitude=lon,
                     createdAt=now,
                     updatedAt=now,
                 )
