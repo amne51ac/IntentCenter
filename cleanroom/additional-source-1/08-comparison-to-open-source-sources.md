@@ -2,7 +2,7 @@
 
 High-level **design posture** only—not a feature matrix.
 
-| Dimension | AS1 (Netcracker—public positioning) | Source A | Sources B–H |
+| Dimension | AS1 | Source A | Sources B–H |
 |-----------|-------------------------------------|----------|-------------|
 | **Primary buyer** | CSPs / large operators (commercial OSS/BSS) | Engineering / automation teams (open platform) | Mixed (open tools, varied scale) |
 | **Delivery** | Licensed suite, partner-led, **managed** options | Self-hosted open source + community/apps | Self-hosted open source |

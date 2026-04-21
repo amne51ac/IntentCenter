@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IntentCenter documentation index — architecture, platform, roadmap, research, and design." />
+  <title>Documentation — IntentCenter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="240" height="48" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="documentation.html" aria-current="page">Documentation</a>
+        <a href="brand.html">Brand</a>
+        <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <p class="crumb">Documentation</p>
+    <h1>IntentCenter documentation</h1>
+    <p class="lead">
+      Guides and specifications for the planning repository and Phase&nbsp;1 platform. Markdown sources live in the
+      repo; these pages are a browsable hub for GitHub Pages.
+    </p>
+
+    <div class="grid-2" style="margin-top: 32px">
+      <a class="doc-card" href="getting-started.html">
+        <h3>Getting started</h3>
+        <p>Clone the repo, configure the API, run Postgres, Prisma migrations, seed data, and open the console.</p>
+      </a>
+      <a class="doc-card" href="architecture.html">
+        <h3>Architecture</h3>
+        <p>System context, logical containers, control vs data plane, deployment patterns, sequences, and plugin boundary (Mermaid diagrams).</p>
+      </a>
+      <a class="doc-card" href="roadmap.html">
+        <h3>Vision &amp; roadmap</h3>
+        <p>Product vision, clean-room traceability, phased roadmap, and non-functional targets.</p>
+      </a>
+      <a class="doc-card" href="platform.html">
+        <h3>Platform &amp; API</h3>
+        <p>Stack summary, REST touchpoints for the UI, bulk import/export, and object graph endpoints.</p>
+      </a>
+      <a class="doc-card" href="llm-assistant.html">
+        <h3>LLM-assisted operations</h3>
+        <p>Design for grounded Q&amp;A, proposal-first changes, bulk mapping, security, and phased rollout.</p>
+      </a>
+      <a class="doc-card" href="cleanroom.html">
+        <h3>Clean-room research</h3>
+        <p>How reference materials map to delivery—and links to the full <code>cleanroom/</code> tree on GitHub.</p>
+      </a>
+      <a class="doc-card" href="brand.html">
+        <h3>Brand guide</h3>
+        <p>Logo usage, palette, typography, voice, and marketing copy patterns.</p>
+      </a>
+    </div>
+
+    <h2>Source files on GitHub</h2>
+    <p>
+      Authoritative Markdown includes
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/README.md">README.md</a>,
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/docs/architecture.md">docs/architecture.md</a>,
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/docs/design-llm-assistant.md">docs/design-llm-assistant.md</a>, and
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/platform/README.md">platform/README.md</a>.
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter ·
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">Source</a>
+      · <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0</a>
+    </p>
+  </footer>
+</body>
+</html>

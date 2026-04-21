@@ -1,41 +1,36 @@
 {
-  "name": "@nims/platform-api",
+  "name": "@intentcenter/platform",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0",
   "type": "module",
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "uv run --directory backend nims-seed"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
+    "dev": "uv run --directory backend nims-api",
+    "start": "NIMS_RELOAD=false uv run --directory backend nims-api",
+    "web:dev": "npm run dev --prefix web",
+    "web:build": "npm run build --prefix web",
+    "build": "npm run web:build",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "lint": "eslint src --ext .ts",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "db:seed": "uv run --directory backend nims-seed",
+    "db:seed:bulk": "uv run --directory backend nims-seed-bulk",
+    "lint": "eslint web",
+    "typecheck": "tsc --noEmit -p web/tsconfig.json",
+    "test": "uv run --directory backend pytest -q",
+    "ci": "npm run lint && npm run typecheck && npm run build && uv run --directory backend ruff check nims && uv run --directory backend pytest -q"
   },
   "dependencies": {
-    "@fastify/cors": "^10.0.2",
-    "dotenv": "^16.4.7",
-    "@fastify/swagger": "^9.4.2",
-    "@fastify/swagger-ui": "^5.2.2",
-    "@graphql-tools/schema": "^10.0.16",
-    "@prisma/client": "^6.1.0",
-    "fastify": "^5.2.1",
-    "fastify-plugin": "^5.0.1",
-    "graphql": "^16.10.0",
-    "mercurius": "^15.1.0",
-    "nanoid": "^5.0.9",
-    "pino": "^9.6.0",
-    "zod": "^3.24.1"
+    "@prisma/client": "^6.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
     "prisma": "^6.1.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
   }
 }

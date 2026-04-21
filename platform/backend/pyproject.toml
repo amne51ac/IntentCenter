@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nims-api"
+version = "0.1.0"
+description = "IntentCenter platform API (FastAPI + SQLAlchemy)"
+license = "AGPL-3.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+  "sqlalchemy>=2.0.36",
+  "psycopg[binary]>=3.2.3",
+  "pydantic-settings>=2.6.0",
+  "pyjwt[crypto]>=2.10.1",
+  "bcrypt>=4.2.0",
+  "httpx>=0.28.0",
+  "strawberry-graphql[fastapi]>=0.253.0",
+]
+
+[project.scripts]
+nims-api = "nims.cli:main"
+nims-seed = "nims.seed_db:main"
+nims-seed-bulk = "nims.seed_provider_bulk:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "httpx>=0.28.0",
+  "ruff>=0.8.0",
+  "sqlacodegen>=3.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["nims"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"nims/models_generated.py" = ["UP042"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

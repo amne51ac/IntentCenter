@@ -2,3 +2,14 @@ node_modules/
 dist/
 .env
 *.log
+coverage/
+web/dist/
+web/node_modules/
+
+# Python (backend)
+backend/.venv/
+.venv-py/
+.ruff_cache/
+.pytest_cache/
+**/__pycache__/
+*.py[cod]

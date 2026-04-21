@@ -18,7 +18,7 @@ Column **Source A** is the primary target (see [`../source-a/`](../source-a/INDE
 
 ## Additional Source 1 (AS1) — commercial CSP OSS/BSS (not open-source)
 
-**AS1** documents **Netcracker** from **public marketing only**—see [`../additional-source-1/INDEX.md`](../additional-source-1/INDEX.md). It does **not** fit the same matrix columns as A–H because it is a **proprietary suite** sold primarily to **communications service providers** with **BSS**, **service orchestration**, and **closed-loop assurance** as **packaged** capabilities.
+**AS1** documents from **public marketing only**—see [`../additional-source-1/INDEX.md`](../additional-source-1/INDEX.md). It does **not** fit the same matrix columns as A–H because it is a **proprietary suite** sold primarily to **communications service providers** with **BSS**, **service orchestration**, and **closed-loop assurance** as **packaged** capabilities.
 
 | Dimension | AS1 (advertised posture) |
 |-----------|---------------------------|

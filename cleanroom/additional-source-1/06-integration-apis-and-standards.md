@@ -2,7 +2,7 @@
 
 ## Open API posture
 
-Netcracker publicly emphasizes **open APIs** and **standard** interface frameworks so CSPs can integrate **partners**, **BSS**, and **orchestrators**. Marketing references **industry API frameworks** (examples cited in public materials include **MEF LSO**-style API families for service provider interoperability).
+AS1 publicly emphasizes **open APIs** and **standard** interface frameworks so CSPs can integrate **partners**, **BSS**, and **orchestrators**. Marketing references **industry API frameworks** (examples cited in public materials include **MEF LSO**-style API families for service provider interoperability).
 
 ## BSS coupling
 

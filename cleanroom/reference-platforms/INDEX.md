@@ -2,7 +2,7 @@
 
 Each designation (**Source B** through **Source H**) has its **own subdirectory** under `cleanroom/`, with an **`INDEX.md`** and numbered topic files (**01–09**), mirroring the structure of **Source A** (`cleanroom/source-a/`).
 
-**Additional Source 1 (AS1)** — commercial **Netcracker** analysis (public materials only): [`../additional-source-1/INDEX.md`](../additional-source-1/INDEX.md).
+**Additional Source 1 (AS1)** — commercial analysis (public materials only): [`../additional-source-1/INDEX.md`](../additional-source-1/INDEX.md).
 
 | Designation | Directory | Start here |
 |-------------|-----------|--------------|

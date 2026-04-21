@@ -10,7 +10,7 @@ Marketing emphasizes **multivendor** service automation across **physical**, **v
 
 ## Public cloud partnerships
 
-Netcracker publicly describes **strategic partnerships** with major **hyperscalers** (for example joint positioning of **active inventory** capabilities on public cloud infrastructure) to reduce time-to-market and support **elastic** scaling—details vary by announcement and region.
+AS1 publicly describes **strategic partnerships** with major **hyperscalers** (for example joint positioning of **active inventory** capabilities on public cloud infrastructure) to reduce time-to-market and support **elastic** scaling—details vary by announcement and region.
 
 ## Operational model
 

@@ -1,8 +1,10 @@
-# Network automation & DCIM platform (planning)
+# IntentCenter — network automation & DCIM platform (planning)
 
-**Repository:** [github.com/amne51ac/untitled-dcim-and-automation-system](https://github.com/amne51ac/untitled-dcim-and-automation-system)
+**Project:** IntentCenter · **Repository:** [github.com/amne51ac/untitled-dcim-and-automation-system](https://github.com/amne51ac/untitled-dcim-and-automation-system)
 
-This repository captures **clean-room research** and a **product roadmap** for a new **network source of truth**, **DCIM**, and **network automation** platform aimed at **provider and distributor scale**: ISPs, backbone operators, hyperscale-adjacent network teams, and large infrastructure organizations that need **throughput**, **resilience**, and **operational maturity**—not lab-sized tooling.
+**Documentation website (GitHub Pages):** after enabling Pages from the `/docs` folder on `main`, the static site is served at **[https://amne51ac.github.io/untitled-dcim-and-automation-system/](https://amne51ac.github.io/untitled-dcim-and-automation-system/)** — landing page, full doc hub, architecture (Mermaid), roadmap, platform API summary, LLM design, clean-room index, and brand guide. See [`docs/PUBLISHING.md`](docs/PUBLISHING.md#github-pages).
+
+This repository captures **clean-room research** and a **product roadmap** for IntentCenter: a new **network source of truth**, **DCIM**, and **network automation** platform aimed at **provider and distributor scale**: ISPs, backbone operators, hyperscale-adjacent network teams, and large infrastructure organizations that need **throughput**, **resilience**, and **operational maturity**—not lab-sized tooling.
 
 The work is **inspired by** design lessons synthesized from multiple reference systems (documented under [`cleanroom/`](cleanroom/README.md) using neutral **Source A–H** and **Additional Source 1** designations). This codebase does **not** copy any third-party source; it is a **planning and specification** home for a greenfield implementation.
 
@@ -134,6 +136,8 @@ flowchart TB
 ```
 
 More diagrams (multi-region deployment, end-to-end change sequence, plugin boundary) are in [`docs/architecture.md`](docs/architecture.md).
+
+**Implementation status:** The diagrams above describe the **target** platform (queues, workers, multi-region, and similar). The code under [`platform/`](platform/) today is a **Phase 1 skeleton**: one **FastAPI** process, **PostgreSQL**, Prisma for **migrations** only, optional **React** static assets served by the API. There is **no** separate worker tier or Celery-style queue in-tree yet (see roadmap Phase 2).
 
 ---
 
@@ -278,20 +282,61 @@ flowchart LR
 ## Repository layout (current)
 
 ```
-cleanroom/          # Clean-room capability & design research (Source A–H, AS1)
-docs/               # Architecture visuals, publishing notes
-  architecture.md   # Extended Mermaid diagrams
-  PUBLISHING.md     # Git / GitHub CLI steps
-platform/           # Phase 1 implementation (API, schema, minimal console)
-  api server: Node + Fastify + Prisma + PostgreSQL; GraphQL read at /graphql
-  web/console.html  # Optional static helper to call the API from a browser
-README.md           # This plan
-LICENSE             # Apache-2.0
+.github/workflows/  # platform-ci.yml — lint, typecheck, web build, pytest (see Tests & CI)
+cleanroom/            # Clean-room capability & design research (Source A–H, AS1)
+docs/                 # Architecture visuals, publishing notes, GitHub Pages static site
+  index.html          # Landing (IntentCenter brand)
+  documentation.html  # Doc hub + links to Markdown sources on GitHub
+  assets/             # site.css, intentcenter-logo.svg, favicon.svg
+  architecture.md     # Extended Mermaid diagrams (authoritative alongside architecture.html)
+  PUBLISHING.md       # Git / GitHub CLI / GitHub Pages steps
+platform/             # Phase 1 implementation (schema, Python API, React console)
+  README.md           # Short platform + web UI notes (see root README for full runbook)
+  prisma/             # Schema & migrations (Prisma); PostgreSQL is the datastore
+  backend/            # Python API — FastAPI + SQLAlchemy; OpenAPI; GraphQL at /graphql
+  web/                # React + Vite UI (build output served by the API under /app/)
+  package.json        # Prisma CLI, ESLint for web/, web build; seed is Python (`nims-seed`)
+  Makefile            # uv-based API: sync, api, seed, test, lint, format
+  backend/uv.lock     # Pinned Python dependencies (use with `uv sync` in backend/)
+README.md             # This plan
+LICENSE               # GNU AGPL-3.0
 ```
 
 ### Run the platform API (local)
 
-From [`platform/`](platform/): copy `.env.example` to `.env`, start Postgres (`docker compose up -d`), then `npm install`, `npx prisma migrate dev`, `npm run db:seed`, `npm run dev`. Open `http://localhost:8080/docs` for OpenAPI and `/graphql` for GraphiQL. Use the seed-printed Bearer token on `/v1/me`.
+From [`platform/`](platform/):
+
+1. Copy [`.env.example`](platform/.env.example) to `.env` and set `DATABASE_URL` and `JWT_SECRET` (see comments in that file).
+2. Start Postgres (e.g. `docker compose up -d` in `platform/`).
+3. **Install [uv](https://docs.astral.sh/uv/)** (recommended) or use `pip` + a venv under `backend/`.
+4. **Node tooling (Prisma + web only):** `npm install` in `platform/`, then **`npm install --prefix web`** (or `npm ci --prefix web`) so the SPA can build and run—same split as CI (`npm ci && npm ci --prefix web`). Run **`npx prisma migrate dev`** (and **`npx prisma generate`** if you use Prisma Client from Node). Seed with **`make seed`** or **`npm run db:seed`** (both run **`nims-seed`** via uv). Optionally **`npm run web:build`** so the API can serve the React app from `web/dist` at `/app/`. For Vite dev server only: **`npm run web:dev`** from `platform/`.
+5. **Python API:** from `platform/`, **`make sync`** (or `cd backend && uv sync --all-extras`, using **`backend/uv.lock`**) installs dependencies; start with **`make api`** or **`uv run --directory backend nims-api`**, or **`npm run dev`** from `platform/` (**`npm run dev`** here starts the **Python API**, not Vite—use **`web:dev`** for the React dev server).
+
+   Defaults: **reload on**, host **0.0.0.0**, port **8080** (override with `API_HOST`, `API_PORT`, `NIMS_RELOAD=false` for production-style runs).
+
+Open **`http://localhost:8080/docs`** for Swagger UI (OpenAPI JSON at `/docs/json`), **`http://localhost:8080/graphql`** for GraphiQL. Use the seed-printed API tokens with `Authorization: Bearer …` on **`GET /v1/me`**, or sign in through the web UI at `/app/`.
+
+### Operator console (web UI)
+
+The React app (served at `/app/` when built) includes:
+
+- **Global search** in the sidebar (`GET /v1/search`).
+- **Pinned pages** at the **top** of the sidebar, stored per user in **`User.preferences.pinnedPages`** (interactive sessions only). Use **Pin page** / **Unpin** in each screen’s **top bar** (not in the nav). Example body: `{"preferences":{"pinnedPages":[{"path":"/dcim/devices","label":"Devices"}]}}`.
+- **Collapsible** sidebar groups (Overview, DCIM, IPAM, Circuits, Platform); open/closed state is remembered in **`localStorage`** (`nims.sidebar.*`).
+- **Model list** pages share a **header toolbar** (`ModelListPageHeader`): **Pin page** / **Unpin** (in the **⋯** menu, user sessions only), **Add new** (where a route exists), **Bulk import** (CSV/JSON **file pickers** in **⋯** → calls `POST /v1/bulk/{type}/import/…`), and **Bulk export** (CSV/JSON via `GET /v1/bulk/{type}/export`). Supported `type` values include core inventory **`Location`**, **`Rack`**, **`Device`**, **`Vrf`**, plus **catalog** resource types exposed by the bulk router (see `platform/backend/nims/routers/v1/bulk.py`).
+- **Tables** use the same **row click** behavior (open the object view where applicable) and a **⋯** menu with **Copy**, **Archive**, and **Delete**; some resource types still surface an alert until the matching REST endpoints exist—DCIM objects use live DELETE where implemented.
+- **Object view** at `/o/:resourceType/:resourceId` loads **`GET /v1/resource-view/{resourceType}/{id}`** (item payload + relationship graph). **`GET /v1/resource-graph/{resourceType}/{id}`** returns graph JSON only (same underlying graph builder).
+
+See also [`platform/README.md`](platform/README.md) for a short web-centric summary.
+
+### Tests & CI (platform)
+
+In [`platform/`](platform/):
+
+- **Web** — `npm run typecheck` (TypeScript for `web/`); `npm run lint` runs ESLint on `web/`.
+- **Python API** — from `platform/`: **`make lint`** / **`make test`**, or `uv run --directory backend ruff check nims` and `uv run --directory backend pytest -q`. **`npm run test`** runs pytest via uv (same as **`make test`**).
+- **Scripts**: `npm run ci` — ESLint, web typecheck, web build, Ruff, pytest (all Python steps use **uv**).
+- **GitHub Actions:** [`.github/workflows/platform-ci.yml`](.github/workflows/platform-ci.yml) — Postgres service, `npm ci` + `npm ci --prefix web` in `platform/`, `uv sync`, Prisma generate/migrate, ESLint, Ruff, web typecheck, web build, pytest. *(If your checkout wraps this project in a parent folder, you may have a second workflow at the monorepo root with adjusted paths.)*
 
 Infrastructure-as-code and ADRs can be added alongside this skeleton as the SDLC matures.
 
@@ -305,7 +350,7 @@ Reference systems are discussed in [`cleanroom/`](cleanroom/README.md) using **S
 
 ## License
 
-See [`LICENSE`](LICENSE). Documentation and specifications contributed here are intended to be **open**; implementation code will follow the same license unless stated otherwise in subfolders.
+This project is licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0). See [`LICENSE`](LICENSE). Documentation and specifications contributed here follow the same terms unless a subfolder states otherwise.
 
 ---
 

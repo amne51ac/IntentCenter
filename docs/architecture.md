@@ -1,6 +1,6 @@
 # Architecture & design visuals
 
-This document expands the [README](../README.md) with diagrams you can maintain as the platform design evolves. Diagrams use [Mermaid](https://mermaid.js.org/), which renders on GitHub.
+This document expands the [README](../README.md) with diagrams you can maintain as the platform design evolves. Diagrams use [Mermaid](https://mermaid.js.org/), which renders on GitHub. Content here describes the **target** architecture (multi-region, queues, plugin registry, etc.); the running code under `platform/` may not implement every box yet—see the root README **Implementation status** note.
 
 ---
 

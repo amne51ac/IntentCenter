@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Design: LLM-assisted operations for IntentCenter — grounded Q&amp;A, proposals, safety." />
+  <title>LLM-assisted operations — IntentCenter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="240" height="48" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="documentation.html">Documentation</a>
+        <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <p class="crumb"><a href="documentation.html">Documentation</a> · LLM assistant</p>
+    <h1>Design: LLM-assisted operations</h1>
+    <p class="badge">Status: Draft · Last updated: 2026-04-20</p>
+    <p class="lead">
+      An <strong>LLM-assisted layer</strong> for grounded answers, draft change bundles, and import/reconciliation
+      help—without making the model a second source of truth. Reads inventory through APIs, proposes structured actions,
+      and executes writes only through the same paths as human operators (audit, RBAC, approval where required).
+    </p>
+
+    <h2>Goals</h2>
+    <table>
+      <thead>
+        <tr><th>Goal</th><th>User-visible outcome</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Throughput</td><td>Faster path from natural language to validated API payloads, bulk mappings, and runbooks.</td></tr>
+        <tr><td>Trust</td><td>Answers cite inventory objects; “unknown” is explicit when data is missing.</td></tr>
+        <tr><td>Safety</td><td>No silent writes; privileged actions use the same gates as today.</td></tr>
+        <tr><td>Operability</td><td>Observable, rate-limited, tenant-scoped usage.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Non-goals (initial phases)</h2>
+    <ul>
+      <li>Replacing deterministic policy engines or compliance checks with model judgment.</li>
+      <li>Unrestricted autonomous remediation without human or policy approval.</li>
+      <li>Training a bespoke foundation model (hosted or self-hosted inference assumed).</li>
+      <li>Storing full customer topologies in an external vector DB without explicit residency/retention decisions.</li>
+    </ul>
+
+    <h2>Personas and scenarios</h2>
+    <table>
+      <thead>
+        <tr><th>Persona</th><th>Scenario</th><th>Assistant role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>NetOps / NOC</td><td>Dependencies / incident context</td><td>Search + resource graph; summarize with citations.</td></tr>
+        <tr><td>DCIM / field</td><td>Maintenance planning</td><td>Draft change bundle; highlight conflicts.</td></tr>
+        <tr><td>Automation engineer</td><td>Recurring procedures</td><td>Draft steps, variables, guardrails for jobs/plugins.</td></tr>
+        <tr><td>Data steward</td><td>Vendor export reconciliation</td><td>Column → schema mapping preview for bulk import.</td></tr>
+        <tr><td>New operator</td><td>Learn the model in context</td><td>Explain this record and links from retrieved fields.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Functional requirements (summary)</h2>
+    <h3>Grounded Q&amp;A (read path)</h3>
+    <p>
+      Optional page context (<code class="mono">resourceType</code>, <code class="mono">id</code>). Tools:
+      <code class="mono">GET /v1/search</code>,
+      <code class="mono">GET /v1/resource-view/{resourceType}/{id}</code>,
+      <code class="mono">GET /v1/resource-graph/{resourceType}/{id}</code>.
+      Short answers with citations; no invented IDs when retrieval is empty.
+    </p>
+    <h3>Change assistance (write path)</h3>
+    <p>Machine-readable proposals; UI preview; execution via existing mutating REST with RBAC.</p>
+    <h3>Bulk import assistance</h3>
+    <p>Column mapping, coercion notes, validation warnings before bulk import endpoints.</p>
+    <h3>Incident / ticket assist (optional)</h3>
+    <p>Extract identifiers from pasted text; resolve via search; return linked inventory summary.</p>
+
+    <h2>System architecture</h2>
+    <p>
+      Copilot orchestrator behind the BFF; tool-calling loop; core domain and workers remain authoritative for state
+      changes.
+    </p>
+
+    <h2>Tooling contract (v1 minimum)</h2>
+    <table>
+      <thead>
+        <tr><th>Tool</th><th>Purpose</th><th>API</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code class="mono">search</code></td><td>Find objects</td><td><code class="mono">GET /v1/search?q=&amp;limit=</code></td></tr>
+        <tr><td><code class="mono">get_resource_view</code></td><td>Fields + graph</td><td><code class="mono">GET /v1/resource-view/…</code></td></tr>
+        <tr><td><code class="mono">get_resource_graph</code></td><td>Graph JSON</td><td><code class="mono">GET /v1/resource-graph/…</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Tools run with the <strong>caller’s credentials</strong>; idempotency keys where supported; hard limits per message/session.
+    </p>
+
+    <h2>Security, privacy, compliance</h2>
+    <ul>
+      <li>Data minimization and optional redaction before model calls.</li>
+      <li>Residency documentation; region pinning / private endpoints for regulated customers.</li>
+      <li>Retention policy for prompts/responses (none, encrypted TTL, opt-in review).</li>
+      <li>Prompt-injection mitigations for text stored in inventory fields.</li>
+      <li>Audit: user, tenant, tools, object ids, whether a mutation ran.</li>
+    </ul>
+
+    <h2>Observability</h2>
+    <p>Latency, tokens, tool errors, rate limits, tracing spans per request and tool call, user-safe error surfaces.</p>
+
+    <h2>UX surfaces</h2>
+    <p>Global assistant with page context; contextual actions on list/detail; confirm dialog for proposals; strong empty/error states.</p>
+
+    <h2>Phased delivery</h2>
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>Scope</th><th>Exit criteria</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>P0</td><td>Grounded Q&amp;A, citations, no writes</td><td>Pilot spot-checks on hallucination rate</td></tr>
+        <tr><td>P1</td><td>Proposals + preview + REST execution</td><td>Dry-run path for defined resource types</td></tr>
+        <tr><td>P2</td><td>Bulk import mapping</td><td>Faster time-to-first-good import</td></tr>
+        <tr><td>P3</td><td>Ticket paste + optional risk narration</td><td>Triage workflow adopted by a team</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Success metrics &amp; risks</h2>
+    <p>
+      Time to answer vs. manual navigation; proposal acceptance rate; import mapping edits; zero unauthorized mutations by
+      design. Mitigations: citations, injection handling, budgets, private LLM options.
+    </p>
+
+    <h2>Open questions</h2>
+    <ol>
+      <li>Embeddings scope (docs-only vs. object embeddings).</li>
+      <li>Multi-tenant deployment topology for copilot.</li>
+      <li>ITSM integration for certain mutations.</li>
+      <li>Internationalization.</li>
+    </ol>
+
+    <p>
+      Full specification:
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/docs/design-llm-assistant.md"><code class="mono">docs/design-llm-assistant.md</code></a>
+    </p>
+
+    <p style="margin-top: 32px">
+      <a href="documentation.html">← Back to documentation</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter · <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">Source</a> ·
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0</a>
+    </p>
+  </footer>
+</body>
+</html>

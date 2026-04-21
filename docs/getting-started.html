@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Run IntentCenter locally — Postgres, FastAPI, Prisma, React console." />
+  <title>Getting started — IntentCenter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="240" height="48" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="documentation.html">Documentation</a>
+        <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <p class="crumb"><a href="documentation.html">Documentation</a> · Getting started</p>
+    <h1>Getting started</h1>
+    <p class="lead">
+      Run the Phase&nbsp;1 stack from <code class="mono">platform/</code>: FastAPI (<code class="mono">backend/nims</code>),
+      PostgreSQL, Prisma for migrations, and the React + Vite console.
+    </p>
+
+    <h2>Prerequisites</h2>
+    <ul class="check">
+      <li><a href="https://docs.astral.sh/uv/">uv</a> (recommended) or pip + a virtualenv under <code class="mono">backend/</code></li>
+      <li>Node.js for Prisma CLI and the web app (<code class="mono">npm install</code> in <code class="mono">platform/</code> and <code class="mono">web/</code>)</li>
+      <li>PostgreSQL (e.g. Docker Compose in <code class="mono">platform/</code>)</li>
+    </ul>
+
+    <h2>Configure and migrate</h2>
+    <ol>
+      <li>From <code class="mono">platform/</code>, copy <code class="mono">.env.example</code> to <code class="mono">.env</code> and set <code class="mono">DATABASE_URL</code> and <code class="mono">JWT_SECRET</code>.</li>
+      <li>Start Postgres (for example <code class="mono">docker compose up -d</code> in <code class="mono">platform/</code>).</li>
+      <li>Install JS deps: <code class="mono">npm install</code> in <code class="mono">platform/</code> and <code class="mono">npm install --prefix web</code> (or <code class="mono">npm ci</code> as in CI).</li>
+      <li>Run <code class="mono">npx prisma migrate dev</code> and <code class="mono">npx prisma generate</code> as needed.</li>
+      <li>Seed: <code class="mono">make seed</code> or <code class="mono">npm run db:seed</code> (runs <code class="mono">nims-seed</code> via uv).</li>
+    </ol>
+
+    <h2>Run the API</h2>
+    <p>From <code class="mono">platform/</code>:</p>
+    <pre><code>make sync          # uv sync in backend
+make api           # or: uv run --directory backend nims-api</code></pre>
+    <p>
+      Defaults: reload on, host <code class="mono">0.0.0.0</code>, port <strong>8080</strong> (override with <code class="mono">API_HOST</code>,
+      <code class="mono">API_PORT</code>, <code class="mono">NIMS_RELOAD=false</code>).
+    </p>
+    <ul>
+      <li>OpenAPI / Swagger: <code class="mono">http://localhost:8080/docs</code></li>
+      <li>OpenAPI JSON: <code class="mono">http://localhost:8080/docs/json</code></li>
+      <li>GraphiQL: <code class="mono">http://localhost:8080/graphql</code></li>
+      <li>Authenticate with seed-printed API tokens: <code class="mono">Authorization: Bearer …</code> on <code class="mono">GET /v1/me</code></li>
+    </ul>
+
+    <h2>Operator console (web UI)</h2>
+    <p>
+      Build the SPA so the API can serve it from <code class="mono">web/dist</code> at <code class="mono">/app/</code>:
+      <code class="mono">npm run web:build</code>. For Vite dev only: <code class="mono">npm run web:dev</code>.
+    </p>
+    <p>
+      <strong>Note:</strong> <code class="mono">npm run dev</code> from <code class="mono">platform/</code> starts the <strong>Python API</strong>, not Vite—use
+      <code class="mono">web:dev</code> for the React dev server.
+    </p>
+
+    <h2>CI parity</h2>
+    <p>
+      From <code class="mono">platform/</code>, <code class="mono">npm run ci</code> runs ESLint, web typecheck, web build, Ruff, and pytest (uv). See
+      <code class="mono">.github/workflows/platform-ci.yml</code> for the GitHub Actions recipe.
+    </p>
+
+    <p style="margin-top: 32px">
+      <a href="documentation.html">← Back to documentation</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter · <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">Source</a> ·
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0</a>
+    </p>
+  </footer>
+</body>
+</html>

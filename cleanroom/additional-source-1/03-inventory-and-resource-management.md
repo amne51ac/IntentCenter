@@ -10,7 +10,7 @@ Public blogs and product messaging promote **Active Resource Inventory** as a **
 
 ## Consolidated / legacy naming
 
-Industry and older collateral sometimes refer to **Consolidated Resource Inventory** or broad **Resource Inventory** as a **central repository** for **topology**, **configuration**, **status**, **connectivity**, and **assignment**—feeding **planning**, **fulfillment**, and **assurance**. Netcracker’s current public naming favors **Active** inventory in cloud-era messaging.
+Industry and older collateral sometimes refer to **Consolidated Resource Inventory** or broad **Resource Inventory** as a **central repository** for **topology**, **configuration**, **status**, **connectivity**, and **assignment**—feeding **planning**, **fulfillment**, and **assurance**. AS1’s current public naming favors **Active** inventory in cloud-era messaging.
 
 ## Service Inventory
 

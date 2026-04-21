@@ -20,6 +20,7 @@ model Organization {
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
+  users    User[]
   projects Project[]
   apiTokens ApiToken[]
   locations Location[]
@@ -38,6 +39,42 @@ model Organization {
   observedStates ObservedResourceState[]
   serviceInstances ServiceInstance[]
   changeRequests ChangeRequest[]
+  objectTemplates   ObjectTemplate[]
+  resourceExtensions ResourceExtension[]
+  dynamicGroups              DynamicGroup[]
+  virtualChassis             VirtualChassis[]
+  controllers                Controller[]
+  deviceRedundancyGroups     DeviceRedundancyGroup[]
+  interfaceRedundancyGroups  InterfaceRedundancyGroup[]
+  powerPanels                PowerPanel[]
+  powerFeeds                 PowerFeed[]
+  cloudNetworks              CloudNetwork[]
+  cloudServices              CloudService[]
+  wirelessNetworks           WirelessNetwork[]
+  vpns                       Vpn[]
+  clusters                   Cluster[]
+  virtualMachines            VirtualMachine[]
+  mplsDomains                MplsDomain[]
+  tags                       Tag[]
+  routeTargets               RouteTarget[]
+  providerNetworks           ProviderNetwork[]
+  rackGroups                 RackGroup[]
+  circuitDiversityGroups     CircuitDiversityGroup[]
+  rackReservations           RackReservation[]
+  tenantGroups               TenantGroup[]
+  contacts                   Contact[]
+  teams                      Team[]
+  ipamNamespaces             IpamNamespace[]
+  virtualDeviceContexts      VirtualDeviceContext[]
+  deviceGroups               DeviceGroup[]
+  modules                    Module[]
+  inventoryItems             InventoryItem[]
+  softwareImageFiles         SoftwareImageFile[]
+  consoleConnections         ConsoleConnection[]
+  powerConnections           PowerConnection[]
+  circuitTerminations        CircuitTermination[]
+  rackElevations             RackElevation[]
+  statusDefinitions          StatusDefinition[]
 }
 
 model Project {
@@ -58,6 +95,35 @@ enum ApiTokenRole {
   READ
   WRITE
   ADMIN
+}
+
+enum UserAuthProvider {
+  LOCAL
+  LDAP
+  AZURE_AD
+  OIDC
+}
+
+/// Interactive sign-in (password, LDAP, OIDC). API automation continues to use ApiToken.
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  email          String
+  displayName    String?
+  /// bcrypt hash; null when the account is SSO-only (no local password).
+  passwordHash   String?
+  role           ApiTokenRole @default(READ)
+  authProvider   UserAuthProvider @default(LOCAL)
+  /// External subject (e.g. OIDC `sub`, LDAP bind DN) for IdP matching.
+  externalSubject String?
+  /// UI prefs: pinned pages, etc. `{ "pinnedPages": [ { "path": "/dcim/devices", "label": "Devices" } ] }`
+  preferences    Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
 }
 
 model ApiToken {
@@ -100,6 +166,8 @@ model Location {
   deletedAt      DateTime?
 
   racks Rack[]
+  powerPanels PowerPanel[]
+  circuitTerminations CircuitTermination[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -119,15 +187,22 @@ model Rack {
   deletedAt      DateTime?
 
   devices Device[]
+  rackGroupId String?   @db.Uuid
+  rackGroup   RackGroup? @relation(fields: [rackGroupId], references: [id])
+  reservations RackReservation[]
+  elevations  RackElevation[]
 
   @@unique([organizationId, locationId, name])
   @@index([organizationId])
+  @@index([rackGroupId])
 }
 
 model Manufacturer {
   id          String       @id @default(uuid()) @db.Uuid
   name        String       @unique
   deviceTypes DeviceType[]
+  deviceFamilies DeviceFamily[]
+  moduleTypes    ModuleType[]
 }
 
 model DeviceType {
@@ -175,6 +250,22 @@ model Device {
 
   interfaces Interface[]
   observed   ObservedResourceState?
+  virtualChassisMemberships VirtualChassisMember[]
+  controllers               Controller[]
+  deviceRedundancyMemberships DeviceRedundancyGroupMember[]
+  frontPorts                  FrontPort[]
+  rearPorts                   RearPort[]
+  consolePorts                ConsolePort[]
+  consoleServerPorts          ConsoleServerPort[]
+  powerPorts                  PowerPort[]
+  powerOutlets                PowerOutlet[]
+  deviceBaysAsParent          DeviceBay[] @relation("DeviceBayParent")
+  deviceBaysAsChild           DeviceBay[] @relation("DeviceBayChild")
+  moduleBays                  ModuleBay[]
+  modules                     Module[]
+  virtualDeviceContexts       VirtualDeviceContext[]
+  deviceGroupMemberships      DeviceGroupMember[]
+  inventoryItems              InventoryItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -197,6 +288,7 @@ model Interface {
   ipAddresses IpAddress[]
   cableEndsA  Cable[] @relation("CableA")
   cableEndsB  Cable[] @relation("CableB")
+  interfaceRedundancyMemberships InterfaceRedundancyGroupMember[]
 
   @@unique([deviceId, name])
   @@index([deviceId])
@@ -229,7 +321,8 @@ model Vrf {
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
 
-  prefixes Prefix[]
+  prefixes      Prefix[]
+  routeTargets  RouteTarget[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -246,6 +339,8 @@ model Prefix {
   parentId       String?  @db.Uuid
   parent         Prefix?  @relation("PrefixHierarchy", fields: [parentId], references: [id])
   children       Prefix[] @relation("PrefixHierarchy")
+  rirId          String?  @db.Uuid
+  rir            Rir?     @relation(fields: [rirId], references: [id])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
@@ -308,7 +403,9 @@ model Provider {
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
 
-  circuits Circuit[]
+  circuits         Circuit[]
+  circuitSegments  CircuitSegment[]
+  providerNetworks ProviderNetwork[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -326,6 +423,10 @@ model Circuit {
   organization   Organization @relation(fields: [organizationId], references: [id])
   providerId     String   @db.Uuid
   provider       Provider @relation(fields: [providerId], references: [id])
+  circuitTypeId  String?  @db.Uuid
+  circuitType    CircuitType? @relation(fields: [circuitTypeId], references: [id])
+  circuitDiversityGroupId String?  @db.Uuid
+  circuitDiversityGroup   CircuitDiversityGroup? @relation(fields: [circuitDiversityGroupId], references: [id], onDelete: SetNull)
   cid            String
   bandwidthMbps  Int?
   status         CircuitStatus @default(PLANNED)
@@ -335,8 +436,51 @@ model Circuit {
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
 
+  segments      CircuitSegment[]
+  terminations  CircuitTermination[]
+
   @@unique([organizationId, cid])
   @@index([organizationId])
+  @@index([circuitTypeId])
+  @@index([circuitDiversityGroupId])
+}
+
+/// Circuits that share fate for diversity planning (e.g. parallel paths that must not share conduit).
+model CircuitDiversityGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  circuits Circuit[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+/// Ordered leg of a multi-carrier or multi-hop circuit; inherits provider when providerId is null.
+model CircuitSegment {
+  id             String   @id @default(uuid()) @db.Uuid
+  circuitId      String   @db.Uuid
+  circuit        Circuit  @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  segmentIndex   Int
+  label          String?
+  providerId     String?  @db.Uuid
+  provider       Provider? @relation(fields: [providerId], references: [id])
+  bandwidthMbps  Int?
+  status         CircuitStatus @default(PLANNED)
+  aSideNotes     String?
+  zSideNotes     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([circuitId, segmentIndex])
+  @@index([circuitId])
 }
 
 // --- AS1-style: service inventory + closed-loop observed state ---
@@ -495,6 +639,861 @@ model AuditEvent {
   @@index([organizationId])
   @@index([resourceType, resourceId])
   @@index([correlationId])
+}
+
+// --- Object templates & custom attributes (per-tenant) ---
+
+/// Form schema + custom fields for a resource type. `definition` JSON: { "version": 1, "fields": [...] }.
+model ObjectTemplate {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  resourceType   String
+  name           String
+  slug           String
+  description    String?
+  isSystem       Boolean  @default(false)
+  isDefault      Boolean  @default(false)
+  definition     Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  resourceExtensions ResourceExtension[]
+
+  @@unique([organizationId, resourceType, slug])
+  @@index([organizationId, resourceType])
+}
+
+/// Key/value bag for non-column custom attributes; one row per resource instance.
+model ResourceExtension {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  resourceType   String
+  resourceId     String   @db.Uuid
+  templateId     String?  @db.Uuid
+  template       ObjectTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  data           Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, resourceType, resourceId])
+  @@index([organizationId])
+}
+
+// --- Extended inventory (Phase 2): org-scoped catalog objects ---
+
+/// Saved filter / membership rules (NetBox-style dynamic groups).
+model DynamicGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  definition     Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model VirtualChassis {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  domainId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  members VirtualChassisMember[]
+
+  @@index([organizationId])
+}
+
+model VirtualChassisMember {
+  id                 String   @id @default(uuid()) @db.Uuid
+  virtualChassisId   String   @db.Uuid
+  virtualChassis     VirtualChassis @relation(fields: [virtualChassisId], references: [id], onDelete: Cascade)
+  deviceId           String   @db.Uuid
+  device             Device   @relation(fields: [deviceId], references: [id])
+  priority           Int      @default(0)
+
+  @@unique([virtualChassisId, deviceId])
+  @@index([deviceId])
+}
+
+model Controller {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  /// Optional: device this controller manages (BMC / automation target).
+  deviceId       String?  @db.Uuid
+  device         Device?  @relation(fields: [deviceId], references: [id])
+  role           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([deviceId])
+}
+
+model DeviceRedundancyGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  protocol       String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  members DeviceRedundancyGroupMember[]
+
+  @@index([organizationId])
+}
+
+model DeviceRedundancyGroupMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  groupId   String   @db.Uuid
+  group     DeviceRedundancyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  deviceId  String   @db.Uuid
+  device    Device   @relation(fields: [deviceId], references: [id])
+  role      String?
+
+  @@unique([groupId, deviceId])
+  @@index([deviceId])
+}
+
+model InterfaceRedundancyGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  protocol       String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  members InterfaceRedundancyGroupMember[]
+
+  @@index([organizationId])
+}
+
+model InterfaceRedundancyGroupMember {
+  id          String   @id @default(uuid()) @db.Uuid
+  groupId     String   @db.Uuid
+  group       InterfaceRedundancyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  interfaceId String   @db.Uuid
+  interface   Interface @relation(fields: [interfaceId], references: [id])
+  role        String?
+
+  @@unique([groupId, interfaceId])
+  @@index([interfaceId])
+}
+
+model PowerPanel {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  locationId     String   @db.Uuid
+  location       Location @relation(fields: [locationId], references: [id])
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  feeds PowerFeed[]
+
+  @@unique([organizationId, locationId, name])
+  @@index([organizationId])
+}
+
+model PowerFeed {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  powerPanelId   String?  @db.Uuid
+  powerPanel     PowerPanel? @relation(fields: [powerPanelId], references: [id])
+  name           String
+  voltage        Int?
+  amperage       Int?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([powerPanelId])
+}
+
+model CloudNetwork {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  cloudProvider  String?
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  services CloudService[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model CloudService {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  cloudNetworkId String?  @db.Uuid
+  cloudNetwork   CloudNetwork? @relation(fields: [cloudNetworkId], references: [id])
+  name           String
+  serviceType    String?
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([cloudNetworkId])
+}
+
+model WirelessNetwork {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  ssid           String?
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Vpn {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  vpnType        String
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Cluster {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  clusterType    String?
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  virtualMachines VirtualMachine[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model VirtualMachine {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clusterId      String?  @db.Uuid
+  cluster        Cluster? @relation(fields: [clusterId], references: [id])
+  name           String
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([clusterId])
+}
+
+model MplsDomain {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  rd             String?
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+// --- NetBox-style taxonomy & extended DCIM (catalog + device components) ---
+
+model CircuitType {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  circuits    Circuit[]
+}
+
+model Rir {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  prefixes    Prefix[]
+}
+
+model Tag {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  color          String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  assignments TagAssignment[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model TagAssignment {
+  id           String @id @default(uuid()) @db.Uuid
+  tagId        String @db.Uuid
+  tag          Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  resourceType String
+  resourceId   String @db.Uuid
+
+  @@unique([tagId, resourceType, resourceId])
+  @@index([resourceType, resourceId])
+}
+
+model RouteTarget {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  vrfId          String?  @db.Uuid
+  vrf            Vrf?     @relation(fields: [vrfId], references: [id])
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([vrfId])
+}
+
+model ProviderNetwork {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  providerId     String   @db.Uuid
+  provider       Provider @relation(fields: [providerId], references: [id])
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, providerId, name])
+  @@index([organizationId])
+}
+
+model RackGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  racks Rack[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model RackReservation {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  rackId         String   @db.Uuid
+  rack           Rack     @relation(fields: [rackId], references: [id])
+  label          String
+  startsAt       DateTime?
+  endsAt         DateTime?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([rackId])
+}
+
+model TenantGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model Contact {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String?
+  phone          String?
+  title          String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+}
+
+model Team {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model DeviceFamily {
+  id             String   @id @default(uuid()) @db.Uuid
+  manufacturerId String?  @db.Uuid
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id])
+  name           String
+  slug           String   @unique
+  description    String?
+}
+
+model SoftwarePlatform {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  versions    SoftwareVersion[]
+  imageFiles  SoftwareImageFile[]
+}
+
+model SoftwareVersion {
+  id           String   @id @default(uuid()) @db.Uuid
+  platformId   String   @db.Uuid
+  platform     SoftwarePlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  version      String
+  releaseNotes String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([platformId, version])
+  @@index([platformId])
+}
+
+model SoftwareImageFile {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  platformId     String?  @db.Uuid
+  platform       SoftwarePlatform? @relation(fields: [platformId], references: [id])
+  filename       String
+  sha256         String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+}
+
+model IpamNamespace {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model VirtualDeviceContext {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  deviceId       String   @db.Uuid
+  device         Device   @relation(fields: [deviceId], references: [id])
+  name           String
+  identifier     String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, deviceId, name])
+  @@index([deviceId])
+}
+
+model DeviceGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  members DeviceGroupMember[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model DeviceGroupMember {
+  id        String      @id @default(uuid()) @db.Uuid
+  groupId   String      @db.Uuid
+  group     DeviceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  deviceId  String      @db.Uuid
+  device    Device      @relation(fields: [deviceId], references: [id])
+
+  @@unique([groupId, deviceId])
+  @@index([deviceId])
+}
+
+model FrontPort {
+  id        String   @id @default(uuid()) @db.Uuid
+  deviceId  String   @db.Uuid
+  device    Device   @relation(fields: [deviceId], references: [id])
+  /// When set, this port sits on a line card (module) in the chassis; deviceId remains the host device.
+  moduleId  String?  @db.Uuid
+  module    Module?  @relation(fields: [moduleId], references: [id])
+  name      String
+  label     String?
+  type      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([deviceId, name])
+  @@index([deviceId])
+  @@index([moduleId])
+}
+
+model RearPort {
+  id        String   @id @default(uuid()) @db.Uuid
+  deviceId  String   @db.Uuid
+  device    Device   @relation(fields: [deviceId], references: [id])
+  name      String
+  label     String?
+  type      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([deviceId, name])
+  @@index([deviceId])
+}
+
+model ConsolePort {
+  id        String   @id @default(uuid()) @db.Uuid
+  deviceId  String   @db.Uuid
+  device    Device   @relation(fields: [deviceId], references: [id])
+  name      String
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  clientConnections ConsoleConnection[] @relation("ConsoleConnClient")
+
+  @@unique([deviceId, name])
+  @@index([deviceId])
+}
+
+model ConsoleServerPort {
+  id        String   @id @default(uuid()) @db.Uuid
+  deviceId  String   @db.Uuid
+  device    Device   @relation(fields: [deviceId], references: [id])
+  name      String
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  serverConnections ConsoleConnection[] @relation("ConsoleConnServer")
+
+  @@unique([deviceId, name])
+  @@index([deviceId])
+}
+
+model PowerPort {
+  id        String   @id @default(uuid()) @db.Uuid
+  deviceId  String   @db.Uuid
+  device    Device   @relation(fields: [deviceId], references: [id])
+  name      String
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  connections PowerConnection[] @relation("PowerConnPort")
+
+  @@unique([deviceId, name])
+  @@index([deviceId])
+}
+
+model PowerOutlet {
+  id        String   @id @default(uuid()) @db.Uuid
+  deviceId  String   @db.Uuid
+  device    Device   @relation(fields: [deviceId], references: [id])
+  name      String
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  connections PowerConnection[] @relation("PowerConnOutlet")
+
+  @@unique([deviceId, name])
+  @@index([deviceId])
+}
+
+model DeviceBay {
+  id                String   @id @default(uuid()) @db.Uuid
+  parentDeviceId    String   @db.Uuid
+  parentDevice      Device   @relation("DeviceBayParent", fields: [parentDeviceId], references: [id])
+  name              String
+  installedDeviceId String?  @db.Uuid
+  installedDevice   Device?  @relation("DeviceBayChild", fields: [installedDeviceId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  @@unique([parentDeviceId, name])
+  @@index([parentDeviceId])
+  @@index([installedDeviceId])
+}
+
+/// A slot (bay) is either on a device chassis or on an installed module (card) for nested line cards.
+model ModuleBay {
+  id               String   @id @default(uuid()) @db.Uuid
+  deviceId         String?  @db.Uuid
+  device           Device?  @relation(fields: [deviceId], references: [id])
+  /// When set, this slot is on a module (card) rather than directly on the device.
+  parentModuleId   String?  @db.Uuid
+  parentModule     Module?  @relation("SlotsOnModule", fields: [parentModuleId], references: [id], onDelete: Cascade)
+  name             String
+  position         Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+  /// At most one module (card) seated in this slot.
+  seatedModule     Module?  @relation("CardInBay")
+
+  @@index([deviceId])
+  @@index([parentModuleId])
+}
+
+model InventoryItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  deviceId       String?  @db.Uuid
+  device         Device?  @relation(fields: [deviceId], references: [id])
+  name           String
+  serial         String?
+  assetTag       String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([deviceId])
+}
+
+model ModuleType {
+  id             String   @id @default(uuid()) @db.Uuid
+  manufacturerId String?  @db.Uuid
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id])
+  model          String
+  partNumber     String?
+  modules        Module[]
+
+  @@unique([manufacturerId, model])
+}
+
+model Module {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  deviceId       String   @db.Uuid
+  device         Device   @relation(fields: [deviceId], references: [id])
+  moduleTypeId   String   @db.Uuid
+  moduleType     ModuleType @relation(fields: [moduleTypeId], references: [id])
+  /// When seated in a bay (slot); null for legacy rows not tied to a slot.
+  moduleBayId    String?  @unique @db.Uuid
+  moduleBay      ModuleBay? @relation("CardInBay", fields: [moduleBayId], references: [id], onDelete: SetNull)
+  serial         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+  /// Slots (bays) defined on this card for nested modules.
+  childSlots     ModuleBay[] @relation("SlotsOnModule")
+  frontPorts     FrontPort[]
+
+  @@index([organizationId])
+  @@index([deviceId])
+}
+
+model ConsoleConnection {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String?
+  serverPortId   String   @unique @db.Uuid
+  serverPort     ConsoleServerPort @relation("ConsoleConnServer", fields: [serverPortId], references: [id])
+  clientPortId   String   @unique @db.Uuid
+  clientPort     ConsolePort @relation("ConsoleConnClient", fields: [clientPortId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+}
+
+model PowerConnection {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String?
+  outletId       String   @unique @db.Uuid
+  outlet         PowerOutlet @relation("PowerConnOutlet", fields: [outletId], references: [id])
+  portId         String   @unique @db.Uuid
+  port           PowerPort @relation("PowerConnPort", fields: [portId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+}
+
+model CircuitTermination {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  circuitId      String   @db.Uuid
+  circuit        Circuit  @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  side           String
+  locationId     String?  @db.Uuid
+  location       Location? @relation(fields: [locationId], references: [id])
+  portName       String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([circuitId, side])
+  @@index([organizationId])
+  @@index([locationId])
+}
+
+model RackElevation {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  rackId         String   @db.Uuid
+  rack           Rack     @relation(fields: [rackId], references: [id])
+  name           String
+  imageUrl       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([rackId])
+}
+
+model StatusDefinition {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  resourceType   String
+  name           String
+  slug           String
+  color          String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, resourceType, slug])
+  @@index([organizationId])
 }
 
 // --- Plugin registry (metadata only in Phase 1) ---

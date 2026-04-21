@@ -1,6 +1,6 @@
 # Clean room documentation
 
-This directory holds **design and capability documentation** produced as a clean-room exercise. **Source Application A** (also **Source A**) is the primary automation-oriented target; **Sources B–H** are open-source comparison references; **Additional Source 1 (AS1)** documents a **commercial** CSP OSS/BSS vendor (**Netcracker**) from **public** information only.
+This directory holds **design and capability documentation** produced as a clean-room exercise. **Source Application A** (also **Source A**) is the primary automation-oriented target; **Sources B–H** are open-source comparison references; **Additional Source 1 (AS1)** documents a **commercial** CSP OSS/BSS vendor from **public** information only.
 
 ## Purpose
 
@@ -15,7 +15,7 @@ This directory holds **design and capability documentation** produced as a clean
 | [`source-a/INDEX.md`](source-a/INDEX.md) | **Source A** — full multi-file analysis (01–12). |
 | [`source-b/INDEX.md`](source-b/INDEX.md) … [`source-h/INDEX.md`](source-h/INDEX.md) | **Sources B–H** — each has its own subdirectory with **01–09** topic files + index. |
 | [`reference-platforms/INDEX.md`](reference-platforms/INDEX.md) | Hub linking Sources A–H + [comparison matrix](reference-platforms/comparison-matrix.md). |
-| [`additional-source-1/INDEX.md`](additional-source-1/INDEX.md) | **AS1** — Netcracker (proprietary); advertised capabilities & design (`01`–`09`). |
+| [`additional-source-1/INDEX.md`](additional-source-1/INDEX.md) | **AS1** — advertised capabilities & design (`01`–`09`). |
 
 ## Naming
 

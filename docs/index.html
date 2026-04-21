@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IntentCenter — open network source of truth, DCIM, and intent-based automation. Declare your network. Mean it." />
+  <title>IntentCenter — Network intent &amp; inventory</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="240" height="48" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="documentation.html">Documentation</a>
+        <a href="brand.html">Brand</a>
+        <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <section class="hero">
+      <p class="crumb">Network source of truth · Operator console</p>
+      <h1><span style="color: var(--accent)">Declare your network.</span> Mean it.</h1>
+      <p class="lead">
+        IntentCenter is an API-first platform for authoritative network and facility inventory, safe automation, and
+        closed-loop operations—built for provider-scale teams that need throughput, resilience, and operational maturity.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="documentation.html">Read the docs</a>
+        <a class="btn btn-secondary" href="getting-started.html">Get started</a>
+        <a class="btn btn-secondary" href="https://github.com/amne51ac/untitled-dcim-and-automation-system">View on GitHub</a>
+      </div>
+    </section>
+
+    <section aria-labelledby="pillars-heading">
+      <h2 id="pillars-heading">Four pillars</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Source of truth</h3>
+          <p>
+            DCIM, IPAM, circuits, and relationships in one model—with versioned REST, GraphQL read paths, events, and
+            bulk interchange—not scattered spreadsheets.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Intent &amp; automation</h3>
+          <p>
+            Orchestrate change through policies, approvals, and jobs; integrate with CI/CD, orchestrators, and
+            northbound systems without giving up auditability.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Open &amp; extensible</h3>
+          <p>
+            Plugin-friendly architecture: add models, APIs, UI, and automation packs without forking core—contracts
+            stay versioned and isolated.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Operator-grade</h3>
+          <p>
+            Built for NOC, field, and platform engineers: global search, object graphs, bulk import/export, and
+            runbooks-first operations.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="impl-heading">
+      <h2 id="impl-heading">Implementation status</h2>
+      <p class="lead" style="max-width: none">
+        The repository includes <strong>clean-room research</strong> (<code>cleanroom/</code>) and a
+        <strong>Phase&nbsp;1 skeleton</strong> under <code>platform/</code> (FastAPI, PostgreSQL, React console). Target
+        architecture diagrams describe multi-region queues and workers; see
+        <a href="architecture.html">Architecture</a> for the full picture and
+        <a href="roadmap.html">Roadmap</a> for phased delivery.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter ·
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">github.com/amne51ac/untitled-dcim-and-automation-system</a>
+      · Licensed under <a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU AGPL-3.0</a>
+    </p>
+  </footer>
+</body>
+</html>

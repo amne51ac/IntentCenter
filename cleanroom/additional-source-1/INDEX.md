@@ -1,7 +1,7 @@
 # Additional Source 1 (AS1) — documentation index
 
 **Designation:** **Additional Source 1** (AS1).  
-**Subject:** Netcracker (commercial **Digital OSS / BSS** portfolio for communications service providers)—**not** open-source; this analysis uses **publicly advertised** capabilities, architecture claims, and industry write-ups only.
+**Subject:** AS1 (commercial **Digital OSS / BSS** portfolio for communications service providers)—**not** open-source; this analysis uses **publicly advertised** capabilities, architecture claims, and industry write-ups only.
 
 | # | Document | Topics |
 |---|----------|--------|

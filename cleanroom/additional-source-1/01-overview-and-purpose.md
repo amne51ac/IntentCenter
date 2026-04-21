@@ -2,7 +2,7 @@
 
 ## What AS1 represents
 
-**Additional Source 1 (AS1)** documents **Netcracker** as described in **public marketing**, **product portfolio pages**, **blogs**, and **analyst solution profiles**—not as reverse-engineered software. Netcracker is a **commercial** supplier of **digital OSS and BSS** solutions, historically strong in **communications service providers (CSPs)** and large-scale telecom operations.
+**Additional Source 1 (AS1)** documents as described in **public marketing**, **product portfolio pages**, **blogs**, and **analyst solution profiles**—not as reverse-engineered software. AS1 is a **commercial** supplier of **digital OSS and BSS** solutions, historically strong in **communications service providers (CSPs)** and large-scale telecom operations.
 
 ## Why include a non-open product
 

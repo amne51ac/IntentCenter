@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IntentCenter target architecture — context, containers, control plane, deployment, sequences." />
+  <title>Architecture — IntentCenter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="240" height="48" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="documentation.html">Documentation</a>
+        <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <p class="crumb"><a href="documentation.html">Documentation</a> · Architecture</p>
+    <h1>Architecture &amp; design visuals</h1>
+    <p class="lead">
+      Target architecture (multi-region, queues, plugin registry, etc.). Code under <code class="mono">platform/</code> may
+      not implement every box yet—see <a href="roadmap.html">Roadmap</a> and the root README for implementation status.
+    </p>
+    <p>
+      Source Markdown:
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/docs/architecture.md"><code class="mono">docs/architecture.md</code></a>
+    </p>
+
+    <h2>1. System context</h2>
+    <p>Who connects to what; northbound systems consume intent and events.</p>
+    <div class="mermaid">
+flowchart TB
+  subgraph actors["People &amp; operators"]
+    NOC[NOC / NetOps]
+    DC[Data center / field]
+    Sec[Security / compliance]
+  end
+
+  subgraph machines["Automation &amp; platforms"]
+    CI[CI/CD &amp; Git]
+    Ext[External orchestrators]
+    Mon[Monitoring / observability stacks]
+  end
+
+  subgraph north["Northbound &amp; enterprise"]
+    BSS[BSS / OSS / billing-adjacent]
+    ITSM[ITSM / ticketing]
+    IdP[Identity provider / SSO]
+  end
+
+  Platform[(Network automation &amp; DCIM platform)]
+
+  NOC --> Platform
+  DC --> Platform
+  Sec --> Platform
+  CI --> Platform
+  Ext --> Platform
+  Mon --> Platform
+  BSS --> Platform
+  Platform --> ITSM
+  IdP --> Platform
+    </div>
+
+    <h2>2. Logical containers</h2>
+    <p>Stateless edge, core services, async work, plugins.</p>
+    <div class="mermaid">
+flowchart LR
+  subgraph edge["Edge &amp; API"]
+    GW[API gateway / BFF]
+    REST[REST vN]
+    GQL[GraphQL read]
+    WS[Realtime / subscriptions]
+  end
+
+  subgraph core["Core domain services"]
+    INV[Inventory &amp; DCIM]
+    IPAM[IPAM &amp; addressing]
+    CIR[Circuits &amp; topology]
+    AUTO[Automation &amp; policies]
+  end
+
+  subgraph async["Async &amp; integration"]
+    Q[Job queue / streams]
+    WRK[Workers &amp; adapters]
+    EVT[Event bus &amp; webhooks]
+  end
+
+  subgraph data["Data plane"]
+    DB[(Primary DB)]
+    REP[(Read replicas)]
+    OBJ[(Object store / artifacts)]
+    CACHE[(Cache)]
+  end
+
+  subgraph ext["Extensibility"]
+    PH[Plugin / app host]
+    REG[Extension registry]
+  end
+
+  GW --> REST
+  GW --> GQL
+  GW --> WS
+  REST --> INV
+  REST --> IPAM
+  REST --> CIR
+  GQL --> INV
+  INV --> DB
+  IPAM --> DB
+  CIR --> DB
+  AUTO --> Q
+  Q --> WRK
+  WRK --> EVT
+  INV --> EVT
+  DB --> REP
+  AUTO --> OBJ
+  GW --> CACHE
+  PH --> REG
+  PH --> REST
+    </div>
+
+    <h2>3. Control plane vs data plane</h2>
+    <div class="mermaid">
+flowchart TB
+  subgraph cp["Control plane"]
+    SOT[Authoritative inventory &amp; intent]
+    POL[Policy &amp; approvals]
+    AUD[Audit &amp; change records]
+  end
+
+  subgraph dp["Data plane execution"]
+    JOBS[Jobs / workflows]
+    ADP[Device &amp; cloud adapters]
+    OBS[Observed state / telemetry ingest]
+  end
+
+  subgraph ext["External reality"]
+    NET[Network &amp; infra under management]
+  end
+
+  SOT --> POL
+  POL --> JOBS
+  JOBS --> ADP
+  ADP --> NET
+  NET --> OBS
+  OBS --> SOT
+  JOBS --> AUD
+  SOT --> AUD
+    </div>
+
+    <h2>4. Multi-region / multi-cloud (reference)</h2>
+    <div class="mermaid">
+flowchart TB
+  subgraph global["Global"]
+    DNS[DNS / global LB / traffic management]
+  end
+
+  subgraph r1["Region A — cloud or on-prem"]
+    K1[Kubernetes / VM cluster]
+    DB1[(Regional DB primary or replica)]
+  end
+
+  subgraph r2["Region B"]
+    K2[Kubernetes / VM cluster]
+    DB2[(Regional DB replica / DR)]
+  end
+
+  OBJG[(Object storage — cross-region replication)]
+
+  DNS --> K1
+  DNS --> K2
+  K1 --> DB1
+  K2 --> DB2
+  DB1 -. replication / backup .-> DB2
+  K1 --> OBJG
+  K2 --> OBJG
+    </div>
+
+    <h2>5. Sequence: change request</h2>
+    <div class="mermaid">
+sequenceDiagram
+  participant U as Operator / API client
+  participant API as API &amp; policy
+  participant SOT as Inventory / intent
+  participant Q as Job queue
+  participant W as Worker / adapter
+  participant T as Target infrastructure
+  participant EVT as Events / webhooks
+
+  U->>API: Propose change (REST/GraphQL)
+  API->>SOT: Validate &amp; record intent
+  API->>API: Policy / approval gate
+  API->>Q: Enqueue job (idempotent key)
+  Q->>W: Dispatch
+  W->>T: Apply change
+  T-->>W: Result
+  W->>SOT: Reconcile state / artifacts
+  SOT->>EVT: Emit change &amp; audit events
+  EVT-->>U: Webhook / subscription notify
+    </div>
+
+    <h2>6. Plugin &amp; app boundary</h2>
+    <div class="mermaid">
+flowchart LR
+  subgraph core["Platform core"]
+    API[Stable public APIs]
+    HOOKS[Hooks: GraphQL, jobs, UI slots, validators]
+  end
+
+  subgraph apps["Apps / plugins"]
+    P1[Discovery pack]
+    P2[Compliance pack]
+    P3[Custom workflow]
+  end
+
+  P1 --> HOOKS
+  P2 --> HOOKS
+  P3 --> HOOKS
+  HOOKS --> API
+    </div>
+
+    <h2>Diagram maintenance</h2>
+    <p>
+      Keep diagrams technology-agnostic until ADRs lock products; prefer one diagram per concern. Edit
+      <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/docs/architecture.md"><code class="mono">docs/architecture.md</code></a>
+      as the source of truth—this page mirrors it for the static site.
+    </p>
+
+    <p style="margin-top: 32px">
+      <a href="documentation.html">← Back to documentation</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter · <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">Source</a> ·
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0</a>
+    </p>
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      securityLevel: "strict",
+      themeVariables: {
+        primaryColor: "#10151f",
+        primaryTextColor: "#e8e8ea",
+        primaryBorderColor: "#e8b84e",
+        lineColor: "#7a8090",
+        secondaryColor: "#161c28",
+        tertiaryColor: "#0b0f18",
+      },
+    });
+  </script>
+</body>
+</html>

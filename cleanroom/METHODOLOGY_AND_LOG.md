@@ -37,7 +37,7 @@
 | Comparison pass | Cloned Sources B–H into workspace root; added `cleanroom/reference-platforms/` (`INDEX.md`, `comparison-matrix.md`, notes for B–H); updated `cleanroom/README.md`. TeemIP uses two repos: core IPAM + zone management. |
 | Deep dive pass | Expanded `source-b.md`–`source-h.md` with stack-specific subsystems (NetBox: RQ/Strawberry/HTMX/plugins; phpIPAM: tools surface; Ralph: Django apps; TeemIP: iTop coupling; NAV: polling/alert subsystems; openDCIM/RackTables: PHP structure); added `source-a/12-deep-dive-cross-cutting-details.md`; updated `source-a/INDEX.md` and `reference-platforms/INDEX.md`. |
 | Restructure | Moved Sources **B–H** into per-source subdirectories `cleanroom/source-b/` … `source-h/`, each with **`INDEX.md`** and **`01`–`09`** topic files (parallel to Source A’s multi-file layout). Removed monolithic `reference-platforms/source-*.md`; hub remains `reference-platforms/INDEX.md` + `comparison-matrix.md`. Updated `cleanroom/README.md`, `METHODOLOGY_AND_LOG.md`, and `source-a/INDEX.md` cross-links. |
-| AS1 pass | Added `cleanroom/additional-source-1/` for **Netcracker** as **Additional Source 1** (public marketing only); updated `README`, `reference-platforms/INDEX`, `comparison-matrix`, `source-a/INDEX`, and reviewer section below. |
+| AS1 pass | Added `cleanroom/additional-source-1/` for **Additional Source 1** (public marketing only); updated `README`, `reference-platforms/INDEX`, `comparison-matrix`, `source-a/INDEX`, and reviewer section below. |
 
 ## Reference for reviewers
 
@@ -67,4 +67,4 @@ Each directory contains **`INDEX.md`** and topic files **`01`–`09`**. Hub: `cl
 
 | Designation | Documentation directory | Notes |
 |-------------|---------------------------|--------|
-| **AS1** (Netcracker) | `cleanroom/additional-source-1/` | **Not** open-source. Analysis based on **public** product marketing, blogs, and analyst summaries only—files **`01`–`09`** + `INDEX.md`. |
+| **AS1** | `cleanroom/additional-source-1/` | **Not** open-source. Analysis based on **public** product marketing, blogs, and analyst summaries only—files **`01`–`09`** + `INDEX.md`. |

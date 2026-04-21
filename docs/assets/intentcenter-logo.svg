@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" width="320" height="64" role="img" aria-labelledby="title desc">
+  <title id="title">IntentCenter</title>
+  <desc id="desc">K4 graph mark and wordmark</desc>
+  <g>
+    <line x1="32" y1="10" x2="10" y2="48" stroke="#e8b84e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="10" y1="48" x2="54" y2="48" stroke="#e8b84e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="54" y1="48" x2="32" y2="10" stroke="#e8b84e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="32" y1="34" x2="32" y2="10" stroke="#e8b84e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="32" y1="34" x2="10" y2="48" stroke="#e8b84e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="32" y1="34" x2="54" y2="48" stroke="#e8b84e" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="32" cy="10" r="4.5" fill="#0b0f18" stroke="#e8b84e" stroke-width="2"/>
+    <circle cx="10" cy="48" r="4.5" fill="#0b0f18" stroke="#e8b84e" stroke-width="2"/>
+    <circle cx="54" cy="48" r="4.5" fill="#0b0f18" stroke="#e8b84e" stroke-width="2"/>
+    <circle cx="32" cy="34" r="6" fill="#e8b84e"/>
+  </g>
+  <text x="80" y="42" font-family="Inter, -apple-system, 'Segoe UI', sans-serif" font-size="28" font-weight="600" letter-spacing="-0.4">
+    <tspan fill="#e8b84e">Intent</tspan><tspan fill="#e8e8ea">Center</tspan>
+  </text>
+</svg>

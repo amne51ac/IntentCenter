@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IntentCenter Phase 1 platform — FastAPI, REST v1, web console, bulk APIs." />
+  <title>Platform &amp; API — IntentCenter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="240" height="48" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="documentation.html">Documentation</a>
+        <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <p class="crumb"><a href="documentation.html">Documentation</a> · Platform</p>
+    <h1>Platform &amp; API (Phase&nbsp;1)</h1>
+    <p class="lead">
+      Stack: <strong>FastAPI</strong> (<code class="mono">backend/nims</code>), <strong>PostgreSQL</strong>,
+      <strong>Prisma</strong> for migrations only, <strong>React + Vite</strong> (<code class="mono">web/</code>). Build output
+      <code class="mono">web/dist</code> can be served by the API under <code class="mono">/app/</code>.
+    </p>
+
+    <h2>Web console (behavioral summary)</h2>
+    <ul>
+      <li><strong>Global search</strong> in the sidebar — <code class="mono">GET /v1/search?q=&amp;limit=</code></li>
+      <li>
+        <strong>Pinned pages</strong> at the top of the sidebar from <code class="mono">User.preferences.pinnedPages</code> —
+        Pin / Unpin in each page header (<strong>⋯</strong> menu), not in the nav. Example:
+        <code class="mono">PATCH /v1/me</code> with <code class="mono">{"preferences":{"pinnedPages":[{"path":"/dcim/devices","label":"Devices"}]}}</code>
+      </li>
+      <li><strong>Sidebar</strong> sections are collapsible; state in <code class="mono">localStorage</code> (<code class="mono">nims.sidebar.*</code>)</li>
+      <li>
+        <strong>List pages</strong> use a shared header: Add, bulk import (CSV/JSON via ⋯), bulk export — backed by bulk routes
+        (see <code class="mono">bulk.py</code> in the repo)
+      </li>
+      <li><strong>Object view</strong> — <code class="mono">GET /v1/resource-view/{resourceType}/{id}</code> (fields + graph)</li>
+      <li><strong>Graph only</strong> — <code class="mono">GET /v1/resource-graph/{resourceType}/{id}</code></li>
+    </ul>
+
+    <h2>REST touchpoints (UI-centric)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Endpoint</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Search</td><td><code class="mono">GET /v1/search?q=&amp;limit=</code></td></tr>
+        <tr><td>Me / preferences</td><td><code class="mono">GET /v1/me</code>, <code class="mono">PATCH /v1/me</code></td></tr>
+        <tr><td>Bulk CSV/JSON</td><td><code class="mono">GET /v1/bulk/{resourceType}/export</code>, <code class="mono">POST /v1/bulk/{resourceType}/import/csv</code>, <code class="mono">POST /v1/bulk/{resourceType}/import/json</code></td></tr>
+        <tr><td>Object view</td><td><code class="mono">GET /v1/resource-view/{resourceType}/{id}</code></td></tr>
+        <tr><td>Graph only</td><td><code class="mono">GET /v1/resource-graph/{resourceType}/{id}</code></td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Authoritative detail: <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system/blob/main/platform/README.md"><code class="mono">platform/README.md</code></a>
+    </p>
+
+    <p style="margin-top: 32px">
+      <a href="documentation.html">← Back to documentation</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter · <a href="https://github.com/amne51ac/untitled-dcim-and-automation-system">Source</a> ·
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0</a>
+    </p>
+  </footer>
+</body>
+</html>
