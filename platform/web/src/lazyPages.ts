@@ -1,0 +1,38 @@
+import { lazy } from "react";
+
+/** Route-based code splits — keep initial `main` chunk small for first visit from marketing site. */
+export const LoginPage = lazy(() => import("./pages/Login").then((m) => ({ default: m.LoginPage })));
+export const AppShell = lazy(() => import("./layout/AppShell").then((m) => ({ default: m.AppShell })));
+export const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })));
+export const CircuitFormPage = lazy(() => import("./pages/circuits/CircuitFormPage").then((m) => ({ default: m.CircuitFormPage })));
+export const CircuitsPage = lazy(() => import("./pages/circuits/Circuits").then((m) => ({ default: m.CircuitsPage })));
+export const ProviderFormPage = lazy(() => import("./pages/circuits/ProviderFormPage").then((m) => ({ default: m.ProviderFormPage })));
+export const ProvidersPage = lazy(() => import("./pages/circuits/Providers").then((m) => ({ default: m.ProvidersPage })));
+export const DeviceFormPage = lazy(() => import("./pages/dcim/DeviceFormPage").then((m) => ({ default: m.DeviceFormPage })));
+export const DevicesPage = lazy(() => import("./pages/dcim/Devices").then((m) => ({ default: m.DevicesPage })));
+export const LocationFormPage = lazy(() => import("./pages/dcim/LocationFormPage").then((m) => ({ default: m.LocationFormPage })));
+export const LocationsPage = lazy(() => import("./pages/dcim/Locations").then((m) => ({ default: m.LocationsPage })));
+export const RackFormPage = lazy(() => import("./pages/dcim/RackFormPage").then((m) => ({ default: m.RackFormPage })));
+export const RacksPage = lazy(() => import("./pages/dcim/Racks").then((m) => ({ default: m.RacksPage })));
+export const IpAddressFormPage = lazy(() => import("./pages/ipam/IpAddressFormPage").then((m) => ({ default: m.IpAddressFormPage })));
+export const IpAddressesPage = lazy(() => import("./pages/ipam/IpAddresses").then((m) => ({ default: m.IpAddressesPage })));
+export const PrefixFormPage = lazy(() => import("./pages/ipam/PrefixFormPage").then((m) => ({ default: m.PrefixFormPage })));
+export const PrefixesPage = lazy(() => import("./pages/ipam/Prefixes").then((m) => ({ default: m.PrefixesPage })));
+export const VlanFormPage = lazy(() => import("./pages/ipam/VlanFormPage").then((m) => ({ default: m.VlanFormPage })));
+export const VlansPage = lazy(() => import("./pages/ipam/Vlans").then((m) => ({ default: m.VlansPage })));
+export const VrfsPage = lazy(() => import("./pages/ipam/Vrfs").then((m) => ({ default: m.VrfsPage })));
+export const VrfFormPage = lazy(() => import("./pages/ipam/VrfFormPage").then((m) => ({ default: m.VrfFormPage })));
+export const AuditPage = lazy(() => import("./pages/platform/Audit").then((m) => ({ default: m.AuditPage })));
+export const ObjectTemplatesPage = lazy(() => import("./pages/platform/ObjectTemplates").then((m) => ({ default: m.ObjectTemplatesPage })));
+export const JobFormPage = lazy(() => import("./pages/platform/JobFormPage").then((m) => ({ default: m.JobFormPage })));
+export const JobRunFormPage = lazy(() => import("./pages/platform/JobRunFormPage").then((m) => ({ default: m.JobRunFormPage })));
+export const JobRunsPage = lazy(() => import("./pages/platform/JobRuns").then((m) => ({ default: m.JobRunsPage })));
+export const JobsPage = lazy(() => import("./pages/platform/Jobs").then((m) => ({ default: m.JobsPage })));
+export const ServiceFormPage = lazy(() => import("./pages/platform/ServiceFormPage").then((m) => ({ default: m.ServiceFormPage })));
+export const ServicesPage = lazy(() => import("./pages/platform/Services").then((m) => ({ default: m.ServicesPage })));
+export const ObjectViewPage = lazy(() => import("./pages/inventory/ObjectViewPage").then((m) => ({ default: m.ObjectViewPage })));
+export const CatalogListPage = lazy(() => import("./pages/inventory/CatalogListPage").then((m) => ({ default: m.CatalogListPage })));
+export const CatalogItemCreatePage = lazy(() => import("./pages/inventory/CatalogItemCreatePage").then((m) => ({ default: m.CatalogItemCreatePage })));
+export const CatalogItemEditPage = lazy(() => import("./pages/inventory/CatalogItemEditPage").then((m) => ({ default: m.CatalogItemEditPage })));
+export const ObjectTemplateEditPage = lazy(() => import("./pages/platform/ObjectTemplateEditPage").then((m) => ({ default: m.ObjectTemplateEditPage })));
+export const ComingSoonPage = lazy(() => import("./pages/ComingSoonPage").then((m) => ({ default: m.ComingSoonPage })));

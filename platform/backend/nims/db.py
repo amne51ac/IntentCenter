@@ -13,7 +13,12 @@ def _normalize_db_url(url: str) -> str:
 
 
 _settings = get_settings()
-engine = create_engine(_normalize_db_url(_settings.database_url), pool_pre_ping=True)
+# Avoid hanging requests when RDS is unreachable (Cloudflare 524) or the pool is wedged
+engine = create_engine(
+    _normalize_db_url(_settings.database_url),
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": 10},
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
