@@ -1,5 +1,6 @@
 import datetime
 import re
+from enum import Enum
 
 import bcrypt
 import jwt
@@ -35,6 +36,13 @@ def _jwt_expires_delta(s: str) -> datetime.timedelta:
     if m:
         return datetime.timedelta(hours=int(m.group(1)))
     return datetime.timedelta(hours=12)
+
+
+def _role_to_str(role: object) -> str:
+    """ORM may return a Python enum or, in edge cases, a raw string from the driver."""
+    if isinstance(role, Enum):
+        return str(role.value)
+    return str(role)
 
 
 def auth_provider_catalog() -> dict[str, list[dict[str, object]]]:
@@ -134,17 +142,31 @@ def post_login(
         ok = False
     if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    if user.Organization_.deletedAt is not None:
+    org = user.Organization_
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User record is missing an organization; re-run database seed or fix data.",
+        )
+    if org.deletedAt is not None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Organization inactive")
 
     from nims.timeutil import utc_now
 
-    exp = utc_now() + _jwt_expires_delta(settings.jwt_expires_in)
-    token = jwt.encode(
-        {"sub": str(user.id), "exp": exp},
-        settings.jwt_secret,
-        algorithm="HS256",
-    )
+    delta = _jwt_expires_delta(settings.jwt_expires_in)
+    # Integer `exp` avoids driver/ORM + PyJWT edge cases with datetime payloads in some deployments.
+    exp_ts = int((utc_now() + delta).timestamp())
+    try:
+        token = jwt.encode(
+            {"sub": str(user.id), "exp": exp_ts},
+            settings.jwt_secret,
+            algorithm="HS256",
+        )
+    except (TypeError, ValueError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Session signing failed (check JWT_SECRET).",
+        ) from e
 
     max_age = int(_jwt_expires_delta(settings.jwt_expires_in).total_seconds())
     response.set_cookie(
@@ -163,11 +185,11 @@ def post_login(
             "id": str(user.id),
             "email": user.email,
             "displayName": user.displayName,
-            "role": user.role.value,
+            "role": _role_to_str(user.role),
             "organization": {
-                "id": str(user.Organization_.id),
-                "name": user.Organization_.name,
-                "slug": user.Organization_.slug,
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
             },
         },
     }
