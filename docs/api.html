@@ -94,6 +94,22 @@
         </tbody>
       </table>
 
+      <h2 id="deploy">Deployment &amp; environment</h2>
+      <p>
+        For production <strong>Docker / Kubernetes</strong> examples, <strong>every environment variable</strong> (auth, LLM,
+        connectors, <code>PG*</code> for RDS, etc.), and a deploy checklist, see
+        <a href="deployment.html">Deployment &amp; environment</a> on this site, or
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/deployment.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>docs/deployment.md</span></a
+        >
+        and
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/environment-variables.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>docs/environment-variables.md</span></a
+        > on GitHub.
+      </p>
+
       <h2 id="v1-ui">Endpoints used by the web UI</h2>
       <p>These are stable touchpoints for the React console (see also <a href="platform.html">Platform &amp; web UI</a>).</p>
       <table>
@@ -110,6 +126,9 @@
           <tr><td>Identity (admin)</td><td><code>GET /v1/admin/identity</code>, <code>PATCH /v1/admin/identity</code></td></tr>
           <tr><td>UI: page registry / slots / nav / federation</td><td><code>GET /v1/ui/page-registry</code>, <code>…/placements</code>, <code>…/navigation</code>, <code>…/federation</code></td></tr>
           <tr><td>Plugins, connectors, jobs</td><td><code>GET /v1/plugins</code>, <code>/v1/connectors</code> (admin writes), <code>/v1/jobs</code>, <code>POST /v1/jobs/{key}/run</code></td></tr>
+          <tr><td>LLM (admin; org default model &amp; endpoint)</td><td><code>GET /v1/admin/llm</code>, <code>PATCH /v1/admin/llm</code>, <code>POST /v1/admin/llm/test</code>, <code>GET /v1/admin/llm/metrics</code></td></tr>
+          <tr><td>Intent Center copilot</td><td><code>POST /v1/copilot/chat</code>, <code>POST /v1/copilot/chat/stream</code>, <code>POST /v1/copilot/suggest_next_steps</code>, <code>GET/POST /v1/copilot/skills</code>, and related routes under <code>/v1/copilot/…</code> (see <code>GET /docs</code>)</td></tr>
+          <tr><td>MCP (optional; off by default)</td><td><code>/mcp</code> on the same origin when <code>NIMS_MCP_ENABLED=1</code>; <code>Authorization: Bearer &lt;api token&gt;</code></td></tr>
           <tr><td>Object view (fields + graph)</td><td><code>GET /v1/resource-view/{resourceType}/{id}</code></td></tr>
           <tr><td>Relationship graph JSON</td><td><code>GET /v1/resource-graph/{resourceType}/{id}</code></td></tr>
           <tr><td>Bulk export</td><td><code>GET /v1/bulk/{resourceType}/export</code></td></tr>

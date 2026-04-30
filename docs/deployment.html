@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IntentCenter — OpenAPI /docs/json, deployment, Docker, Kubernetes, and full environment variable reference." />
+  <title>Deployment &amp; API spec — IntentCenter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+  <link rel="stylesheet" href="assets/docs-layout.css" />
+</head>
+<body class="docs-page" data-docs-page="deployment">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="site-logo" href="index.html">
+        <img src="assets/intentcenter-logo.svg" alt="IntentCenter" width="200" height="40" />
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="index.html#about">About</a>
+        <a href="documentation.html">Docs</a>
+        <a href="https://demo.intentcenter.io" rel="noopener noreferrer" target="_blank">Live demo</a>
+        <a class="github-icon-link" href="https://github.com/amne51ac/intentcenter" rel="noopener noreferrer" target="_blank" aria-label="View repository on GitHub"><img class="github-mark-img" src="assets/github-mark.svg" width="20" height="20" alt=""></a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="docs-shell">
+    <aside id="docs-sidebar" class="docs-sidebar" aria-label="Section navigation"></aside>
+    <main class="docs-main docs-prose">
+    <p class="crumb"><a href="documentation.html">Documentation</a> · Deployment</p>
+    <h1>Deployment &amp; API access</h1>
+    <p class="lead">
+      How to read the <strong>live API spec</strong>, run the production <strong>Docker</strong> image, use the example
+      <strong>Compose</strong> and <strong>Kubernetes</strong> manifests, and configure <strong>every</strong> environment
+      variable.
+    </p>
+
+    <h2>API specification (OpenAPI)</h2>
+    <p>
+      On a running instance (default local port <code class="mono">8080</code>):
+    </p>
+    <ul>
+      <li><strong>OpenAPI JSON</strong> — <code class="mono">GET /docs/json</code> (codegen, contract tests)</li>
+      <li><strong>API browser</strong> — <code class="mono">GET /docs</code> (loads the JSON client-side)</li>
+      <li><strong>REST v1</strong> — all resources under <code class="mono">/v1/…</code></li>
+    </ul>
+
+    <h2>Authoritative sources (GitHub)</h2>
+    <ul>
+      <li>
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/deployment.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>deployment.md</span></a
+        >
+        — deploy modes, RDS <code class="mono">PG*</code> + entrypoint, worker, checklist
+      </li>
+      <li>
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/environment-variables.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>environment-variables.md</span></a
+        >
+        — <strong>complete</strong> variable listing (core, auth, LLM, MCP, jobs, connectors, seeds)
+      </li>
+      <li>
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/platform/deploy/README.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>platform/deploy/README.md</span></a
+        >
+        — Docker Compose and <code class="mono">kubectl</code> apply order
+      </li>
+    </ul>
+
+    <h2>Example files in the repository</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Path</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code class="mono">platform/Dockerfile</code></td>
+          <td>Production image: Prisma migrate, <code class="mono">web/dist</code>, uvicorn on 8080</td>
+        </tr>
+        <tr>
+          <td><code class="mono">platform/docker-compose.yml</code></td>
+          <td>Local Postgres only (port 5433)</td>
+        </tr>
+        <tr>
+          <td><code class="mono">platform/deploy/docker-compose.app.example.yml</code></td>
+          <td>Postgres + API; optional <code class="mono">worker</code> with profile <code class="mono">async-jobs</code></td>
+        </tr>
+        <tr>
+          <td><code class="mono">platform/deploy/kubernetes/*.yaml</code></td>
+          <td>Namespace, ConfigMap, Secret template, API Deployment + Service, optional worker</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top: 32px">
+      <a href="documentation.html">← Documentation home</a>
+    </p>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>
+      IntentCenter ·
+      <a class="github-icon-link" href="https://github.com/amne51ac/intentcenter" rel="noopener noreferrer" target="_blank" aria-label="View repository on GitHub"
+        ><img class="github-mark-img" src="assets/github-mark.svg" width="20" height="20" alt=""></a
+      >
+      ·
+      <a href="https://demo.intentcenter.io" rel="noopener noreferrer" target="_blank">Live demo</a>
+      ·
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL-3.0</a>
+    </p>
+  </footer>
+  <script src="assets/docs-nav.js" defer></script>
+</body>
+</html>

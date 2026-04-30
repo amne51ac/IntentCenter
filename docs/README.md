@@ -10,19 +10,22 @@ Key entry points:
 
 | Path | Role |
 |------|------|
-| `index.html` | Product landing (**About** — what / why / how), **in-app screenshots**; **live demo** at [https://demo.intentcenter.io](https://demo.intentcenter.io) |
+| `index.html` | Product landing (**About** — what / why / how), **in-app assistant & AI**; **in-app screenshots**; **live demo** at [https://demo.intentcenter.io](https://demo.intentcenter.io) |
 | `documentation.html` | Doc hub and links to repo sources |
 | `demo-database.md` | **AWS demo:** deploy / `deploy.sh` / ECS (entrypoint runs migrations); console & emergency Prisma notes |
-| `platform.html` | Web console + REST summary (inventory, extensibility, auth touchpoints) |
+| `platform.html` | Web console + REST summary (inventory, **copilot & LLM**, extensibility, auth, optional **MCP**) |
 | `getting-started.html` | Local runbook (Postgres, API, optional **job worker**, env) |
+| `deployment.html` / `deployment.md` | **OpenAPI** (`/docs/json`), Docker/K8s **deploy** examples, checklist |
+| `environment-variables.md` | **Full** list of `AUTH_*`, `LLM_*`, `CONNECTOR_*`, `PG*`, seeds, etc. |
 | `api.html` | REST/OpenAPI, authentication surfaces, v1 touchpoints |
 | `architecture.md` / `architecture.html` | Target architecture (diagrams) |
 | `design-auth-user-management.md` | **Sign-in & identity**: local email/password, **LDAP** / **Entra** / **OIDC** (at most one external), `AUTH_*` env vs DB, admin API, `GET /v1/auth/providers` |
 | `design-api-token-authentication.md` | Bearer token authentication for automation |
-| `design-llm-assistant.md` | LLM copilot design; **§18** — extensibility, async jobs, connectors, UI navigation, federation (builtin) |
+| `design-llm-assistant.md` | In-app **copilot**: tool-grounded chat, page & chat–aware **next steps**, **skills**, import assist, triage; **§0** preview consent; **§18** extensibility, jobs, connectors |
+| `design-mcp-server.md` | Optional **MCP** (`/mcp`, API-token auth, role-scoped tools) for external LLM clients |
 | `design-extensibility-plugins-widgets.md` | Widget slots, placements, registry (Phase 0–1) |
 | `assets/site.css`, `assets/github-mark.svg`, `assets/intentcenter-logo.svg`, `assets/favicon.svg` | Shared styles, GitHub mark for links, and marks |
-| `assets/screenshots/*.png` | Product UI reference imagery for the static site |
+| `assets/screenshots/*.png` | Product UI reference imagery for the static site; includes `ai-assistant-inventory-charts-maps.png` (copilot: Q&A, charts, maps) |
 | `.nojekyll` | Disables Jekyll so static assets deploy cleanly |
 
 ### Custom domain

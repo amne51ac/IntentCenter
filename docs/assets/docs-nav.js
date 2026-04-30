@@ -16,6 +16,7 @@
       items: [
         { id: "api", href: "api.html", label: "REST & OpenAPI" },
         { id: "platform", href: "platform.html", label: "Web UI & endpoints" },
+        { id: "deployment", href: "deployment.html", label: "Deployment & env" },
       ],
     },
     {

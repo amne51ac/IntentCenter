@@ -52,6 +52,8 @@ Reserved / not yet implemented: `POST /v1/plugins/install` (**501**), remote mod
 | Plugins / placements (admin) | `GET/POST/PATCH/DELETE /v1/admin/plugin-placements` |
 | Connectors (admin writes) | `GET/POST/PATCH/DELETE /v1/connectors` |
 | Jobs | `GET /v1/jobs`, `POST /v1/jobs/{key}/run` (optional `queued` if async), `GET /v1/job-runs` |
+| LLM (admin) | `GET /v1/admin/llm`, `PATCH /v1/admin/llm`, `POST /v1/admin/llm/test`, `GET /v1/admin/llm/metrics` |
+| Copilot (chat, next steps, skills) | `POST /v1/copilot/chat`, `POST /v1/copilot/chat/stream`, `POST /v1/copilot/suggest_next_steps`, `GET/POST/PATCH/DELETE /v1/copilot/skills` — see `copilot.py` / OpenAPI for assist & triage |
 | Plugin install (reserved) | `POST /v1/plugins/install` → **501** until signing + store |
 | Bulk CSV/JSON | `GET /v1/bulk/{resourceType}/export`, `POST /v1/bulk/{resourceType}/import/csv`, `POST /v1/bulk/{resourceType}/import/json` (core types + catalog types — see `bulk.py`) |
 | Object view (UI) | `GET /v1/resource-view/{resourceType}/{id}` — item fields + graph |
@@ -60,3 +62,21 @@ Reserved / not yet implemented: `POST /v1/plugins/install` (**501**), remote mod
 For full run instructions, database setup, and CI, see the repository root [`README.md`](../README.md).
 
 **Hosted demo (AWS):** schema updates usually come from **deploying a new image** that includes the latest `prisma/migrations/`; `docker-entrypoint.sh` runs `prisma migrate deploy` on container start. Use your normal **`./deploy.sh` / AWS** flow, or the console to force a new ECS deployment—see [`docs/demo-database.md`](../docs/demo-database.md). For emergencies, `npm run db:migrate:deploy` from `platform/` with the demo `DATABASE_URL` is a fallback.
+
+## AI assistant (copilot), LLM admin, and optional MCP
+
+- **In-app panel:** the **Intent Center** copilot (slide-out) streams chat with **OpenAI-style tool calls** to inventory: search, view/graph, `inventory_stats`, `catalog_breakdown` / `catalog_list` (including pre-registered **catalog query** entries such as per-site or “without interface” device lists), `list_location_hierarchy`, and `propose_change_preview` (mutations are preview-gated as in the design spec). The UI renders **markdown**; object references in replies can be **linkified** to the catalog.
+- **“Next steps”** chips: `POST /v1/copilot/suggest_next_steps` with page context and recent messages — **topic-aware** (heuristic + optional LLM) so suggestions follow the thread, not only generic org snapshots.
+- **Admin (ADMIN only):** `GET/PATCH /v1/admin/llm`, `POST /v1/admin/llm/test`, `GET /v1/admin/llm/metrics` — org-level default model and base URL; **environment** `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_DEFAULT_MODEL` (and optional `LLM_AZURE_API_VERSION`) **override** the admin UI for unattended deployments. When no LLM is enabled, the API still returns deterministic next-step and suggestion fallbacks.
+- **Other copilot routes:** `POST /v1/copilot/chat` and `…/stream`, `POST /v1/copilot/assist/import-mapping`, `POST /v1/copilot/assist/ticket-triage`, `POST /v1/copilot/suggest_thread_title`, `GET /v1/copilot/suggestions` (static chips for empty state), and CRUD for org **skills** under `GET/POST/PATCH/DELETE /v1/copilot/skills`.
+- **Internal extension LLM (optional):** `POST /v1/internal/llm/complete` (guarded with `NIMS_INTERNAL_LLM_KEY` header) for workers or plugins.
+- **MCP (off by default):** set `NIMS_MCP_ENABLED=1` to mount **Streamable HTTP** MCP on **`/mcp`**, same host as the API, using **API tokens** as `Authorization: Bearer` (read/write/admin roles filter tools). See [`../docs/design-mcp-server.md`](../docs/design-mcp-server.md).
+
+| Concern | Env / flag (see `.env.example`) |
+|--------|----------------------------------|
+| OpenAI-compatible LLM for copilot | `LLM_ENABLED`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_DEFAULT_MODEL` |
+| Tool round limit | `COPILOT_MAX_TOOL_ROUNDS` |
+| Expose MCP | `NIMS_MCP_ENABLED` |
+| Internal LLM for extensions | `NIMS_INTERNAL_LLM_KEY` |
+
+**Deployment:** the production image, OpenAPI contract (`/docs`, `/docs/json`), full **environment** inventory, and example **Docker Compose** and **Kubernetes** files live in [`../docs/deployment.md`](../docs/deployment.md), [`../docs/environment-variables.md`](../docs/environment-variables.md), and [`deploy/README.md`](deploy/README.md).

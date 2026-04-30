@@ -45,7 +45,8 @@
           <li><a href="https://demo.intentcenter.io" rel="noopener noreferrer" target="_blank">Live demo (hosted app)</a> — try the operator console in the browser</li>
           <li><a href="getting-started.html">Getting started</a> — run Postgres, API, optional <strong>job worker</strong>, and console locally</li>
           <li><a href="api.html">REST &amp; OpenAPI</a> — auth (session, bearer tokens, sign-in options), v1 touchpoints</li>
-          <li><a href="platform.html">Web UI &amp; platform</a> — inventory, <strong>extensibility</strong> (placements, connectors, navigation), <strong>sign-in</strong> summary</li>
+          <li><a href="platform.html">Web UI &amp; platform</a> — inventory, <strong>AI copilot</strong> &amp; <strong>LLM</strong>, <strong>extensibility</strong> (placements, connectors, navigation), <strong>sign-in</strong>, optional <strong>MCP</strong></li>
+          <li><a href="deployment.html">Deployment &amp; environment</a> — OpenAPI <code class="mono">/docs/json</code>, Docker/Kubernetes examples, <strong>full env var list</strong> (see GitHub <code class="mono">docs/environment-variables.md</code>)</li>
           <li><a href="data-model.html">Data model</a> — Prisma object types and anchors</li>
           <li><a href="architecture.html">Architecture</a> — context, containers, sequences (Mermaid)</li>
         </ul>
@@ -58,6 +59,27 @@
           <p>
             Documentation uses the same <strong>charcoal</strong> surfaces, <strong>Signal Amber</strong> accents, and
             <strong>JetBrains Mono</strong> labels as the React operator console—so what you read here matches what you run in production.
+          </p>
+        </div>
+      </div>
+
+      <div class="doc-hero-strip" style="margin-top: 2rem">
+        <img
+          src="assets/screenshots/ai-assistant-inventory-charts-maps.png"
+          width="840"
+          height="473"
+          alt="AI assistant: inventory Q&amp;A, bar chart of circuits by location, map of locations with coordinates"
+          loading="lazy"
+        />
+        <div class="doc-hero-copy">
+          <p class="section-label" style="margin-bottom: 8px">AI assistant</p>
+          <p>
+            The in-app <strong>Intent Center</strong> copilot answers inventory questions with tool-grounded data and can
+            show <strong>charts</strong> and <strong>maps</strong> in the chat (for example, aggregations by location and
+            geo from the catalog). See
+            <a href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-llm-assistant.md" rel="noopener noreferrer" target="_blank"
+              >design-llm-assistant.md</a
+            > on GitHub.
           </p>
         </div>
       </div>
@@ -82,15 +104,23 @@
         </a>
         <a class="doc-card" href="platform.html">
           <h3>Web UI &amp; platform</h3>
-          <p>Stack summary, sign-in/identity, UI extensibility (registry, slots, nav), connectors, jobs, and REST touchpoints.</p>
+          <p>Stack summary, in-app <strong>copilot</strong> and admin <strong>LLM</strong>, sign-in/identity, UI extensibility, connectors, jobs, optional <strong>MCP</strong> endpoint, REST touchpoints.</p>
+        </a>
+        <a class="doc-card" href="deployment.html">
+          <h3>Deployment &amp; API spec</h3>
+          <p>OpenAPI discovery, production Docker image, Compose + Kubernetes sample manifests, and every environment variable (GitHub).</p>
+        </a>
+        <a class="doc-card" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-mcp-server.md" rel="noopener noreferrer" target="_blank">
+          <h3>MCP server (GitHub) ↗</h3>
+          <p>Optional <code class="mono">/mcp</code> for Cursor and other clients; API-token auth; role-scoped tools; off by default.</p>
         </a>
         <a class="doc-card" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-auth-user-management.md" rel="noopener noreferrer" target="_blank">
           <h3>Auth &amp; user management (GitHub) ↗</h3>
           <p>Local login, LDAP, Entra, OIDC, <code>AUTH_*</code> env, admin identity API, and public provider catalog.</p>
         </a>
         <a class="doc-card" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-llm-assistant.md" rel="noopener noreferrer" target="_blank">
-          <h3>LLM + extensibility (GitHub) ↗</h3>
-          <p>Copilot design, §18 — async worker, connector policy, federation (builtin), macros, remaining product choices.</p>
+          <h3>LLM copilot (GitHub) ↗</h3>
+          <p>Tool-grounded chat, preview for destructive work, <strong>next steps</strong> &amp; <strong>skills</strong>, import &amp; triage assist, §18 extensibility (async worker, connectors, federation, macros).</p>
         </a>
       </div>
 
@@ -112,6 +142,18 @@
         <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-extensibility-plugins-widgets.md" rel="noopener noreferrer" target="_blank"
           ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
           <span>design-extensibility-plugins-widgets.md</span></a
+        >,
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-mcp-server.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>design-mcp-server.md</span></a
+        >,
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/deployment.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>deployment.md</span></a
+        >,
+        <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/environment-variables.md" rel="noopener noreferrer" target="_blank"
+          ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+          <span>environment-variables.md</span></a
         >.
       </p>
 

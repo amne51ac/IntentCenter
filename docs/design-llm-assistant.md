@@ -4,6 +4,10 @@
 **Last updated:** 2026-04-29  
 **Related:** [Architecture & design visuals](architecture.md), [Platform README](../platform/README.md), [User & sign-in (env vs admin UI)](design-auth-user-management.md)
 
+![Intent Center AI assistant: natural-language inventory Q&A, a bar chart of circuits by location, and a map of locations with coordinates](assets/screenshots/ai-assistant-inventory-charts-maps.png)
+
+*In-app **chat** can return tool-backed answers and render **chart** and **map** blocks in Markdown (for example, catalog breakdowns by location, and geographic views when coordinate data is present in `list_location_hierarchy`). Screenshot: production-style panel with conversations, tool-grounded text, a vertical bar chart, and a Leaflet map.*
+
 ---
 
 ## 0. Non-negotiable: preview and permission for destructive work

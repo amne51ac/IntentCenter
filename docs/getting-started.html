@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Run IntentCenter locally — Postgres, FastAPI, Prisma, React console." />
+  <meta name="description" content="Run IntentCenter locally — Postgres, FastAPI, Prisma, React console, optional copilot LLM and MCP." />
   <title>Getting started — IntentCenter</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -92,6 +92,21 @@ make api           # or: uv run --directory backend nims-api</code></pre>
       <code class="mono">web:dev</code> for the React dev server.
     </p>
 
+    <h2>Copilot, LLM, and MCP (optional)</h2>
+    <p>
+      For the in-app <strong>AI assistant</strong>, set <code class="mono">LLM_ENABLED=1</code> and
+      <code class="mono">LLM_BASE_URL</code> / <code class="mono">LLM_API_KEY</code> / <code class="mono">LLM_DEFAULT_MODEL</code>
+      in <code class="mono">.env</code>, or configure the same values in the console under <strong>Administration → LLM</strong> after
+      an admin sign-in. Without a model, the API still returns <strong>deterministic</strong> “next step” chip fallbacks. To
+      expose <strong>Model Context Protocol</strong> for external clients at <code class="mono">/mcp</code>, set
+      <code class="mono">NIMS_MCP_ENABLED=1</code> (read the security notes in
+      <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-mcp-server.md" rel="noopener noreferrer" target="_blank"
+        ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+        <span>design-mcp-server.md</span></a
+      >). See <code class="mono">platform/.env.example</code> for <code class="mono">COPILOT_MAX_TOOL_ROUNDS</code> and
+      <code class="mono">NIMS_INTERNAL_LLM_KEY</code> (internal completion endpoint).
+    </p>
+
     <h2>Background job worker (optional)</h2>
     <p>
       For long-running jobs and connector sync off the request path, set <code class="mono">JOB_EXECUTION_MODE=async</code> in
@@ -107,6 +122,20 @@ make api           # or: uv run --directory backend nims-api</code></pre>
     <p>
       From <code class="mono">platform/</code>, <code class="mono">npm run ci</code> runs ESLint, web typecheck, web build, Ruff, and pytest (uv). See
       <code class="mono">.github/workflows/platform-ci.yml</code> for the GitHub Actions recipe.
+    </p>
+
+    <h2>Deploy to production (API spec, env, K8s)</h2>
+    <p>
+      <a href="deployment.html">Deployment &amp; environment</a> in this static site, and
+      <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/deployment.md" rel="noopener noreferrer" target="_blank"
+        ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+        <span>docs/deployment.md</span></a
+      > /
+      <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/environment-variables.md" rel="noopener noreferrer" target="_blank"
+        ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+        <span>docs/environment-variables.md</span></a
+      > on GitHub, describe the OpenAPI <code class="mono">/docs/json</code> contract, the Docker image, example
+      <code class="mono">platform/deploy</code> Compose and Kubernetes files, and the full <strong>environment</strong> surface.
     </p>
 
     <p style="margin-top: 32px">

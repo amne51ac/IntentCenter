@@ -34,6 +34,8 @@ htmlcov/
 *.pem
 *.key
 secrets/
+platform/deploy/kubernetes/02-secret-nims.yaml
+platform/deploy/docker-compose.app.yml
 
 # Local AWS deploy kit (copy deployment/env.template to deployment/.env; not tracked)
 deployment/

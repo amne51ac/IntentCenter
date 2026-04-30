@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="IntentCenter — open network source of truth, DCIM, IPAM, circuits, safe automation, extensible UI, and flexible sign-in. What it is, why it exists, and the live demo at demo.intentcenter.io." />
+  <meta name="description" content="IntentCenter — open network source of truth, DCIM, IPAM, circuits, safe automation, in-app AI copilot with tool-grounded answers, optional MCP for external LLMs, extensible UI, and flexible sign-in. Live demo at demo.intentcenter.io." />
   <title>IntentCenter — Network intent &amp; inventory</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <!-- Warm connection to the live app so the first click from this site to the demo is faster -->
@@ -84,6 +84,14 @@
       <h2>The operator console</h2>
       <div class="screenshot-grid">
         <figure class="screenshot-card">
+          <img src="assets/screenshots/ai-assistant-inventory-charts-maps.png" width="1200" height="675" alt="AI assistant chat showing inventory Q&amp;A, a bar chart of circuits by location, and a map of locations with coordinates" loading="lazy" />
+          <figcaption>
+            <strong>AI assistant</strong>
+            Ask natural-language questions about inventory; the assistant uses tools for grounded answers and can render
+            <strong>chart</strong> and <strong>map</strong> blocks in chat (for example, circuits by location, locations with coordinates from the catalog).
+          </figcaption>
+        </figure>
+        <figure class="screenshot-card">
           <img src="assets/screenshots/overview-dashboard.png" width="1200" height="675" alt="Overview dashboard with inventory counts and sidebar navigation" loading="lazy" />
           <figcaption>
             <strong>Overview</strong>
@@ -143,11 +151,35 @@
         <div class="card">
           <h3>Operator-grade</h3>
           <p>
-            Built for NOC, field, and platform engineers: global search, object graphs, bulk import/export, and
-            runbooks-first operations.
+            Built for NOC, field, and platform engineers: global search, object graphs, bulk import/export, an
+            in-app <strong>AI copilot</strong> grounded in tools, and runbooks-first operations.
           </p>
         </div>
       </div>
+    </section>
+
+    <section style="max-width: 56rem; margin: 0 auto 2.5rem; padding: 0 1.5rem" aria-labelledby="ai-assistant-heading">
+      <p class="section-label" id="ai-assistant-heading">Assistant</p>
+      <h2>Intent Center AI</h2>
+      <p>
+        The console includes a built-in <strong>copilot</strong> that answers from your inventory using
+        <strong>server-side tools</strong> (search, object view and relationship graph, org-wide stats, composable
+        breakdowns and row lists, and change <strong>preview</strong> flows for safe proposals). Responses can include
+        <strong>data visualizations</strong>—for example, bar charts from <code class="mono">catalog_breakdown</code> and
+        maps from <code class="mono">list_location_hierarchy</code> when coordinates exist. Suggested
+        <strong>Next steps</strong> are tailored to the <strong>current page and chat</strong>, not only high-level
+        “org inventory” ideas. <strong>ADMIN</strong> can configure the OpenAI-compatible <strong>LLM</strong> in-app or
+        through environment variables; the API can optionally expose a <strong>Model Context Protocol</strong>
+        (MCP) endpoint at <code class="mono">/mcp</code> for external clients such as IDE assistants, using the same
+        <strong>API token</strong> model as the REST API.
+      </p>
+      <p>
+        For behavior, safety, and the optional MCP design, see the
+        <a href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-llm-assistant.md" rel="noopener noreferrer" target="_blank"
+          >LLM assistant</a> and
+        <a href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-mcp-server.md" rel="noopener noreferrer" target="_blank"
+          >MCP server</a> specifications in the repository.
+      </p>
     </section>
 
     <section style="max-width: 56rem; margin: 0 auto 3rem; padding: 0 1.5rem" aria-labelledby="ops-security-heading">

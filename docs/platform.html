@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="IntentCenter Phase 1 — FastAPI, React console, UI extensibility, jobs, connectors, sign-in options." />
+  <meta name="description" content="IntentCenter Phase 1 — FastAPI, React console, AI copilot &amp; LLM, optional MCP, UI extensibility, jobs, connectors, sign-in options." />
   <title>Platform &amp; API — IntentCenter</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -69,6 +69,46 @@
       >.
     </p>
 
+    <h2>AI assistant, LLM, and optional MCP</h2>
+    <p>
+      The <strong>Intent Center</strong> copilot (in the web app) uses an OpenAI-style API with
+      <strong>tool calls</strong> to search, show object view and graph, run composable
+      <code class="mono">catalog_breakdown</code> and <code class="mono">catalog_list</code> queries, and surface change
+      <strong>previews</strong>. <strong>Next step</strong> chip suggestions use page context and the recent chat. Admins
+      configure the model at <code class="mono">GET/PATCH /v1/admin/llm</code>; environment variables
+      <code class="mono">LLM_*</code> override the database when set. With <code class="mono">NIMS_MCP_ENABLED=1</code>, the
+      same process mounts <strong>Streamable HTTP MCP</strong> at <code class="mono">/mcp</code> for clients that speak the
+      Model Context Protocol, using <strong>API tokens</strong> as with REST.
+    </p>
+    <figure style="max-width: 100%; margin: 1.25rem 0 0">
+      <img
+        src="assets/screenshots/ai-assistant-inventory-charts-maps.png"
+        width="1200"
+        height="675"
+        alt="AI assistant chat: devices without interfaces, bar chart of circuits by location, map of locations with coordinates"
+        loading="lazy"
+        style="width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--doc-border, #2a2f3a)"
+      />
+      <figcaption style="margin-top: 0.75rem; font-size: 0.9rem; color: var(--text-muted, #8b95a5)">
+        The assistant can answer inventory questions, render <strong>chart</strong> blocks (e.g. aggregations from
+        <code class="mono">catalog_breakdown</code>), and <strong>map</strong> blocks (e.g. <code class="mono">list_location_hierarchy</code> when locations have coordinates).
+      </figcaption>
+    </figure>
+    <ul>
+      <li><strong>Chat:</strong> <code class="mono">POST /v1/copilot/chat</code>, <code class="mono">POST /v1/copilot/chat/stream</code></li>
+      <li><strong>Next steps (chips):</strong> <code class="mono">POST /v1/copilot/suggest_next_steps</code> (body includes page <code class="mono">context</code> and <code class="mono">messages</code>)</li>
+      <li><strong>Admin LLM config:</strong> <code class="mono">GET/PATCH /v1/admin/llm</code>, <code class="mono">POST /v1/admin/llm/test</code>, <code class="mono">GET /v1/admin/llm/metrics</code></li>
+      <li><strong>Skills, import assist, triage, titles:</strong> <code class="mono">/v1/copilot/skills</code>, <code class="mono">…/assist/import-mapping</code>, <code class="mono">…/assist/ticket-triage</code>, <code class="mono">…/suggest_thread_title</code></li>
+      <li><strong>Design:</strong> <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-llm-assistant.md" rel="noopener noreferrer" target="_blank"
+        ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+        <span>design-llm-assistant.md</span></a
+      >,
+      <a class="github-inline" href="https://github.com/amne51ac/intentcenter/blob/main/docs/design-mcp-server.md" rel="noopener noreferrer" target="_blank"
+        ><img class="github-mark-inline" src="assets/github-mark.svg" width="16" height="16" alt="" aria-hidden="true" />
+        <span>design-mcp-server.md</span></a
+      >.
+    </ul>
+
     <h2>Extensibility &amp; jobs</h2>
     <ul>
       <li><strong>UI:</strong> <code class="mono">GET /v1/ui/page-registry</code>, <code class="mono">GET /v1/ui/placements</code>, <code class="mono">GET /v1/ui/navigation</code>, <code class="mono">GET /v1/ui/federation</code> (builtin-only manifest).</li>
@@ -94,6 +134,8 @@
         <tr><td>Plugins (list)</td><td><code class="mono">GET /v1/plugins</code></td></tr>
         <tr><td>Connectors</td><td><code class="mono">GET/POST/PATCH/DELETE /v1/connectors</code> (admin for writes)</td></tr>
         <tr><td>Jobs &amp; runs</td><td><code class="mono">GET /v1/jobs</code>, <code class="mono">POST /v1/jobs/{key}/run</code>, <code class="mono">GET /v1/job-runs</code></td></tr>
+        <tr><td>LLM (admin)</td><td><code class="mono">GET /v1/admin/llm</code>, <code class="mono">PATCH /v1/admin/llm</code>, <code class="mono">POST /v1/admin/llm/test</code></td></tr>
+        <tr><td>Copilot (chat, next steps, skills)</td><td><code class="mono">POST /v1/copilot/chat</code>, <code class="mono">POST /v1/copilot/suggest_next_steps</code>, <code class="mono">/v1/copilot/skills</code> (see OpenAPI for full list)</td></tr>
         <tr><td>Bulk CSV/JSON</td><td><code class="mono">GET /v1/bulk/{resourceType}/export</code>, <code class="mono">POST /v1/bulk/{resourceType}/import/csv</code>, <code class="mono">POST /v1/bulk/{resourceType}/import/json</code></td></tr>
         <tr><td>Object view</td><td><code class="mono">GET /v1/resource-view/{resourceType}/{id}</code></td></tr>
         <tr><td>Graph only</td><td><code class="mono">GET /v1/resource-graph/{resourceType}/{id}</code></td></tr>
