@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { apiJson, apiSsePost } from "../api/client";
 import {
@@ -7,6 +7,7 @@ import {
   loadAssistantChats,
   saveAssistantChats,
   titleFromFirstUserMessage,
+  type AssistantMsg,
   type AssistantThread,
 } from "../lib/assistantChatsStorage";
 import { ChatMarkdown } from "./ChatMarkdown";
@@ -18,6 +19,9 @@ type CopilotChatRes = { message: { role: string; content: string } };
 const PANEL_WIDTH_STORAGE = "intentcenter.aiAssistant.widthPx";
 const PANEL_W_MIN = 280;
 const PANEL_W_DEFAULT = 384;
+
+/** Composer grows with content up to this many lines, then scrolls. */
+const ASSISTANT_COMPOSER_MAX_LINES = 8;
 
 function clampWidth(px: number): number {
   if (typeof window === "undefined") return PANEL_W_DEFAULT;
@@ -74,11 +78,16 @@ async function errorTextFromResponse(res: Response): Promise<string> {
   return detail || `HTTP ${res.status}`;
 }
 
-type SseEvent = { type: string; text?: string; message?: string };
+type SseEvent = { type: string; text?: string; message?: string; done?: boolean };
 
+/**
+ * Read SSE/NDJSON from the response and invoke `onEvent` for each object.
+ * `onEvent` may return a Promise; the parser **awaits** it so the caller can
+ * `await` after each token (avoids React 18 batching an entire stream into one frame).
+ */
 function parseSseStream(
   res: Response,
-  onEvent: (e: SseEvent) => void,
+  onEvent: (e: SseEvent) => void | Promise<void>,
 ): Promise<void> {
   if (!res.ok) {
     return errorTextFromResponse(res).then((t) => {
@@ -91,7 +100,7 @@ function parseSseStream(
   let buffer = "";
   return (async () => {
     let endSignal = false;
-    const processLine = (s: string) => {
+    const processLine = async (s: string) => {
       const t = s.replace(/^\uFEFF/, "").trim();
       if (!t) return;
       let raw: string;
@@ -108,26 +117,27 @@ function parseSseStream(
         endSignal = true;
         return;
       }
+      let parsed: Record<string, unknown> & SseEvent;
       try {
-        const parsed = JSON.parse(raw) as Record<string, unknown> & SseEvent;
-        if (parsed.error != null && parsed.type == null) {
-          const er = parsed.error as { message?: string } | string;
-          const msg =
-            typeof er === "object" && er && typeof er.message === "string" ? er.message : String(parsed.error);
-          onEvent({ type: "error", message: msg });
-          return;
-        }
-        onEvent(parsed as SseEvent);
+        parsed = JSON.parse(raw) as Record<string, unknown> & SseEvent;
       } catch {
-        /* ignore */
+        return;
       }
+      if (parsed.error != null && parsed.type == null) {
+        const er = parsed.error as { message?: string } | string;
+        const msg =
+          typeof er === "object" && er && typeof er.message === "string" ? er.message : String(parsed.error);
+        await Promise.resolve(onEvent({ type: "error", message: msg }));
+        return;
+      }
+      await Promise.resolve(onEvent(parsed as SseEvent));
     };
     for (;;) {
       const { done, value } = await reader.read();
       if (value) buffer += dec.decode(value, { stream: true });
       if (done) {
         for (const line of buffer.split("\n")) {
-          processLine(line);
+          await processLine(line);
           if (endSignal) return;
         }
         return;
@@ -135,7 +145,7 @@ function parseSseStream(
       const parts = buffer.split("\n");
       buffer = parts.pop() ?? "";
       for (const line of parts) {
-        processLine(line);
+        await processLine(line);
         if (endSignal) return;
       }
     }
@@ -151,7 +161,11 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [panelWidthPx, setPanelWidthPx] = useState(() => readStoredWidth());
+  /** Bumps when an assistant run finishes so next-step suggestions refetch with the full new transcript. */
+  const [nextStepsEpoch, setNextStepsEpoch] = useState(0);
+  const messagesForSuggestRef = useRef<AssistantMsg[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
   const storeRef = useRef(store);
   storeRef.current = store;
@@ -161,26 +175,22 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
     [store.threads, store.activeId],
   );
 
-  const nextStepsKey = useMemo(
-    () =>
-      [
-        loc.pathname,
-        store.activeId,
-        messages.length,
-        messages.at(-1)?.content?.slice(0, 160) ?? "",
-      ].join("|"),
-    [loc.pathname, store.activeId, messages],
-  );
+  messagesForSuggestRef.current = messages;
 
   const nextSteps = useQuery({
-    queryKey: ["copilot", "suggest_next_steps", nextStepsKey],
+    /* One cache entry per “turn”; epoch bumps in runAssistant’s finally so each reply triggers a new fetch. */
+    queryKey: ["copilot", "suggest_next_steps", store.activeId, nextStepsEpoch],
     queryFn: () =>
       apiJson<{ suggestions: Suggestion[] }>("/v1/copilot/suggest_next_steps", {
         method: "POST",
-        body: JSON.stringify({ context: ctx, messages }),
+        body: JSON.stringify({
+          context: ctx,
+          /* Ref avoids a stale `messages` closure if the request runs in a different microtask than the render. */
+          messages: messagesForSuggestRef.current,
+        }),
       }),
     enabled: !pending,
-    staleTime: 20_000,
+    staleTime: 0,
   });
 
   useEffect(() => {
@@ -191,6 +201,26 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, pending, store.activeId, streamStatus]);
+
+  const sizeAssistantComposer = useCallback(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const cs = getComputedStyle(el);
+    const lhRaw = cs.lineHeight;
+    const fontSize = parseFloat(cs.fontSize) || 14;
+    const lineH =
+      lhRaw === "normal" || !parseFloat(lhRaw) ? fontSize * 1.4 : Math.max(1, parseFloat(lhRaw) || fontSize * 1.4);
+    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const maxPx = lineH * ASSISTANT_COMPOSER_MAX_LINES + padY;
+    el.style.height = "auto";
+    const sh = el.scrollHeight;
+    el.style.height = `${Math.min(sh, maxPx)}px`;
+    el.style.overflowY = sh > maxPx + 0.5 ? "auto" : "hidden";
+  }, []);
+
+  useLayoutEffect(() => {
+    sizeAssistantComposer();
+  }, [input, panelWidthPx, sizeAssistantComposer]);
 
   const runAssistant = useCallback(
     async (userText: string) => {
@@ -219,7 +249,7 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
 
       try {
         const res = await apiSsePost("/v1/copilot/chat/stream", payload);
-        await parseSseStream(res, (ev) => {
+        await parseSseStream(res, async (ev) => {
           if (ev.type === "delta" && typeof ev.text === "string") {
             acc += ev.text;
             setStreamStatus(null);
@@ -237,6 +267,8 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
                 };
               }),
             }));
+            // Yield the main thread so React paints between tokens (React 18+ batches sync updates in one frame).
+            await new Promise<void>((r) => setTimeout(r, 0));
           } else if (ev.type === "status" && typeof ev.text === "string") {
             setStreamStatus(ev.text);
           } else if (ev.type === "error") {
@@ -317,6 +349,7 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
       } finally {
         setPending(false);
         setStreamStatus(null);
+        setNextStepsEpoch((e) => e + 1);
       }
     },
     [ctx],
@@ -410,11 +443,9 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
 
   const onObjectContext = ctx.resourceType && ctx.id;
   const nextSuggestions = nextSteps.data?.suggestions;
+  // Show whenever we have suggestions. Do not gate on isLoading: it can block chips during some refetch paths.
   const showNextSteps =
-    !nextSteps.isError &&
-    !nextSteps.isLoading &&
-    Array.isArray(nextSuggestions) &&
-    nextSuggestions.length > 0;
+    !nextSteps.isError && Array.isArray(nextSuggestions) && nextSuggestions.length > 0;
 
   return (
     <aside
@@ -558,7 +589,7 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
             <div className="ai-assistant-next-step-chips" role="group" aria-label="LLM next step options">
               {nextSuggestions.map((s) => (
                 <button
-                  key={s.id}
+                  key={`${s.id}-${nextStepsEpoch}`}
                   type="button"
                   className="ai-assistant-chip ai-assistant-chip--next"
                   onClick={() => {
@@ -579,11 +610,12 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
         <form onSubmit={onSubmit} className="ai-assistant-form">
           <div className="ai-assistant-composer">
             <textarea
+              ref={composerRef}
               className="input ai-assistant-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              rows={2}
+              rows={1}
               placeholder="Message the assistant…"
               disabled={pending}
             />

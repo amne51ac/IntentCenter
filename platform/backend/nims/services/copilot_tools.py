@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from nims.auth_context import AuthContext
 from nims.models_generated import Circuit, Device, IpAddress, Location, Prefix, Provider, Rack, Vrf
 from nims.services.copilot_aggregates import device_breakdown_json, location_hierarchy_json
+from nims.services.copilot_catalog_query import CATALOG_QUERY_SPECS, catalog_query_json
 from nims.services.device_hardware import build_device_hardware_tree
 from nims.services.global_search import global_search_items
 from nims.services.llm_metrics import bump as _metrics_bump
@@ -168,20 +169,55 @@ OPENAI_TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "function": {
             "name": "device_count_breakdown",
             "description": (
-                "**Grouped device counts** for the organization (read-only, suitable for tables and `chart` blocks in Markdown). "
-                "Use for: devices per location, per device type (manufacturer+model), per device role, or by device status. "
-                "This replaces guessing from search, which is substring-based and not an aggregate report."
+                "**Legacy alias** for grouped counts: same data as `catalog_breakdown` using a `group_by` string instead of "
+                "`query`. Prefer `catalog_breakdown` for new questions so you can pick any `Entity/dimension` id from the "
+                "composable list (devices, circuits, racks by location, status, provider, etc.)."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "group_by": {
                         "type": "string",
-                        "enum": ["location", "device_type", "device_role", "status"],
-                        "description": "location: count devices at each site (devices in racks; unplaced in 'Unplaced'). device_type: per hardware type. device_role: per role name. status: per lifecycle status.",
+                        "enum": [
+                            "location",
+                            "device_type",
+                            "device_role",
+                            "status",
+                            "circuits_by_location",
+                        ],
+                        "description": (
+                            "location: count devices at each site (devices in racks; unplaced in 'Unplaced'). "
+                            "device_type: per hardware type. device_role: per role name. status: per lifecycle status. "
+                            "circuits_by_location: count distinct circuits that have a termination at each site "
+                            "(a circuit touching two sites appears in both rows)."
+                        ),
                     }
                 },
                 "required": ["group_by"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "catalog_breakdown",
+            "description": (
+                "**Primary composable aggregate** (read-only): one tool for org-scoped **grouped counts** by a validated "
+                "`query` id (`BaseEntity/dimension`, e.g. `Device/location`, `Circuit/provider`). Use for tables, "
+                "`chart` blocks, and as a building block in **multi-step** analysis (call several times, then merge). "
+                "Add `search` / `get_resource_view` / `inventory_stats` as needed. Server runs SQL; you do not need a "
+                "separate one-off tool per chart type if the combination is in `allowedQueries` (errors list it)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "enum": CATALOG_QUERY_SPECS,
+                        "description": "Composite id: which objects to count and by which dimension (see enum).",
+                    }
+                },
+                "required": ["query"],
             },
         },
     },
@@ -340,8 +376,30 @@ def execute_copilot_tool(
     if name == "device_count_breakdown":
         gb = str(arguments.get("group_by", "") or "").strip()
         if not gb:
-            return json.dumps({"error": "group_by is required", "enum": ["location", "device_type", "device_role", "status"]})
+            return json.dumps(
+                {
+                    "error": "group_by is required",
+                    "enum": [
+                        "location",
+                        "device_type",
+                        "device_role",
+                        "status",
+                        "circuits_by_location",
+                    ],
+                }
+            )
         return _clip(device_breakdown_json(db, oid, gb))
+
+    if name == "catalog_breakdown":
+        q = str(arguments.get("query", "") or "").strip()
+        if not q:
+            return json.dumps(
+                {
+                    "error": "query is required",
+                    "allowedQueries": CATALOG_QUERY_SPECS,
+                }
+            )
+        return _clip(catalog_query_json(db, oid, q))
 
     if name == "propose_change_preview":
         summary = str(arguments.get("summary", ""))[:4000]

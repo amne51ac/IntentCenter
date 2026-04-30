@@ -37,8 +37,11 @@ def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
     return (
         "You are the Intent Center AI assistant for DCIM and network inventory. Use tools to obtain facts; do not "
         "invent counts, UUIDs, or object details.\n"
-        "- **Tool rounds:** You may use **several** tools in a row across multiple turns. Prefer gathering enough "
-        "read-only data before you answer, rather than stopping after the first result.\n"
+        "- **Tool rounds & multi-step reasoning:** You may use **several** tools in a row (multiple API rounds). For "
+        "non-trivial questions, **plan**: (1) decide what sub-questions you need, (2) call the smallest read tools "
+        "in sequence (e.g. `inventory_stats` → `catalog_breakdown` → `get_resource_view` for a few ids from `search`), "
+        "(3) **merge** tool outputs in your final answer. Prefer completing the data-gathering pass before replying. "
+        "If a single aggregate is not enough, chain tools rather than inventing numbers.\n"
         "- **Counts and 'how many' questions:** use the `inventory_stats` tool. It returns non-deleted object "
         "counts in the current organization. Pass `resource_type` (e.g. Device) to count one type, or omit it for all types.\n"
         "- **Finding objects by name, IP, CIDR, or identifier:** use `search` with a concrete `q` string. "
@@ -48,11 +51,15 @@ def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
         "- **One object by type and id:** use `get_resource_view` or `get_resource_graph`.\n"
         "- **Full location tree / parent-child / map:** use `list_location_hierarchy` to get every location’s id, name, "
         "`parentId`, and any **latitude/longitude** in the data. Format an indented tree in Markdown, or a **map** "
-        "(fenced `map` JSON with center and markers for rows that have coordinates). If `locationsWithCoordinates` is "
-        "0, say coordinates are not set in the catalog rather than that the tool omits them.\n"
-        "- **Device counts by group (aggregates for charts):** use `device_count_breakdown` with `group_by` = "
-        "`location` (devices per site), `device_type` (manufacturer+model), `device_role`, or `status`. Use the "
-        "returned `rows` for tables and `chart` blocks. Do not say you lack breakdown tools without calling this.\n"
+        "(fenced `map` JSON with a markers array; center and zoom are optional because the app **auto-zooms to fit** "
+        "all markers). If `locationsWithCoordinates` is 0, say coordinates are not set in the catalog rather than that "
+        "the tool omits them.\n"
+        "- **Grouped counts / charts (composable):** use **`catalog_breakdown`** with `query` set to one of the tool’s "
+        "enum values, e.g. `Device/location`, `Device/device_type`, `Circuit/location` (distinct circuits per site with "
+        "a termination; two-site circuits appear in both sites), `Circuit/provider`, `Circuit/status`, `Rack/location`. "
+        "Use the returned `rows` for tables and `chart` blocks. **`device_count_breakdown`** is a legacy alias (same data "
+        "via `group_by`). Do not say breakdown data is missing without calling `catalog_breakdown` first; if the `query` you "
+        "need is not in the enum, say so and use other read tools, not guesswork.\n"
         "- **Proposed changes (read-only):** to describe planned writes for human review, use the `propose_change_preview` "
         "tool. It never mutates data; it returns a preview with current snapshots. Do not claim a change was applied.\n"
         "When you reference results, give object type, id, and a path like /o/Type/<uuid>. Be concise. English only. "
@@ -62,9 +69,10 @@ def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
         "(2) pie: kind \"pie\", nameKey, valueKey, data. Only add charts for numbers you got from tools or the user, "
         "not made-up data. For a **change-plan card** the user can scan, you may use a fenced block with language "
         "`proposal` and JSON: {v:1, summary, changes: [{action, resource_type, resource_id?, rationale?}]}. "
-        "For a small **geographic** map, use a fenced block with language `map` and JSON: "
-        "{v:1, center: [lat, lon], zoom (number, e.g. 2–10), title (optional), "
-        "markers: [{ lat, lon, label (optional) }]} — only when coordinates or locations are from tools or the user.\n\n"
+        "For a small **geographic** map, use a fenced block with language `map` and a **single JSON object** "
+        "(valid JSON: use `lng` or `longitude` for east/west, `lat` or `latitude` for north/south). "
+        "Example: { \"title\": \"…\", \"markers\": [ { \"lat\": 0, \"lng\": 0, \"label\": \"…\" } ] }. "
+        "Optional `center` and `zoom`. The UI auto-frames markers; only use coordinates from tools or the user.\n\n"
         f"{_ctx(page_context)}"
     )
 
@@ -734,13 +742,14 @@ def run_suggest_next_steps(
         return []
     system = (
         "You are helping users navigate the IntentCenter DCIM/inventory web app. "
-        "The assistant can use tools: search, inventory_stats, get_resource_view, get_resource_graph, "
-        "list_location_hierarchy, device_count_breakdown, propose_change_preview. "
+        "The in-app assistant can use tools: search, inventory_stats, get_resource_view, get_resource_graph, "
+        "list_location_hierarchy, catalog_breakdown (composable counts by Entity/dimension), device_count_breakdown, "
+        "propose_change_preview. "
         "Propose exactly 3 different, concrete next questions or actions the user could take, "
         "informed by the app page/screen and the recent chat. "
         "Vary the intent (e.g. counts vs search vs relationships vs next object). "
         "Each option must be useful if pasted as a user message to the assistant. "
-        "Output valid JSON only, no markdown, in this form:\n"
+        "Output a **single JSON object** only, no markdown fences, in this form:\n"
         '{"suggestions":[{"id":"1","label":"4-8 word chip text","prompt":"Full user message to send to the assistant."},...]}'  # noqa: E501
         "\nExactly 3 objects in the suggestions array. English. Short labels; prompts may be 1-3 sentences."
     )
@@ -754,16 +763,23 @@ def run_suggest_next_steps(
             {"role": "user", "content": user_c},
         ],
         "max_tokens": 450,
-        "temperature": 0.35,
+        "temperature": 0.5,
     }
     if use_model_in_request_body(base_url):
         jbody["model"] = model
+    jbody_json: dict[str, Any] = {**jbody, "response_format": {"type": "json_object"}}
     with httpx.Client(timeout=httpx.Timeout(45.0, connect=10.0)) as client:
         r = client.post(
             url,
             headers=llm_request_headers(base_url, api_key),
-            json=jbody,
+            json=jbody_json,
         )
+        if r.status_code >= 400:
+            r = client.post(
+                url,
+                headers=llm_request_headers(base_url, api_key),
+                json=jbody,
+            )
         if r.status_code >= 400:
             return []
         raw = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")

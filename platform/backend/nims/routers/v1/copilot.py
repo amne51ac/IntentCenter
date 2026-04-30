@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from typing import Annotated, Any
@@ -395,6 +396,90 @@ def _format_messages_for_next_steps(raw: list[Any]) -> str:
     return t
 
 
+def _fallback_suggest_next_steps(page_s: str, chat_t: str) -> list[dict[str, Any]]:
+    """Deterministic 3 options when the LLM is off or returns empty/unparseable JSON.
+    Varies with `chat_t` + `page_s` so repeated calls are not byte-identical as the chat grows.
+    """
+    raw = f"{page_s or ''}\n{chat_t or ''}".encode("utf-8", errors="replace")
+    h = int(hashlib.sha256(raw).hexdigest()[:12], 16)
+    has_object = "Object shown in the UI" in (page_s or "")
+
+    stat_variants: list[tuple[str, str, str]] = [
+        (
+            "fb_stats",
+            "Org-wide inventory totals",
+            "How many devices, locations, circuits, racks, and other main types are in this organization? "
+            "Use the inventory_stats tool and summarize the numbers.",
+        ),
+        (
+            "fb_stats2",
+            "Count devices, sites, and circuits",
+            "Use inventory_stats with no resource_type, then call out the largest counts. "
+            "If the user only cares about one type, they can say which.",
+        ),
+        (
+            "fb_stats3",
+            "What’s in this org inventory?",
+            "Summarize this organization’s inventory: run inventory_stats and describe the main object types and counts "
+            "in a short list.",
+        ),
+    ]
+    breakdown_variants: list[tuple[str, str, str]] = [
+        (
+            "fb_breakdowns",
+            "Counts by site and by provider",
+            "Use catalog_breakdown with query Device/location, then Circuit/location, then Circuit/provider. "
+            "Show the top rows in a short table or two chart blocks; only use numbers from tool output.",
+        ),
+        (
+            "fb_breakdowns2",
+            "Devices and circuits by location",
+            "Run catalog_breakdown for Device/location and for Circuit/location. Compare the busiest sites in a table "
+            "or two small charts; use only tool output.",
+        ),
+        (
+            "fb_breakdowns3",
+            "Racks and circuits by site",
+            "Use catalog_breakdown with Rack/location, then Circuit/location. Summarize where capacity and carrier "
+            "circuits concentrate; cite tool rows only.",
+        ),
+    ]
+    third_variants: list[tuple[str, str, str]] = [
+        (
+            "fb_graph" if has_object else "fb_search",
+            "Summarize links for this object" if has_object else "Search by name, IP, or CIDR",
+            "I am on an object page. Use get_resource_view and get_resource_graph to summarize this object's "
+            "relationships and what depends on it. Keep ids and types explicit."
+            if has_object
+            else (
+                "I want to find a specific object. Help me pick a good search string (hostname fragment, IP, or CIDR) "
+                "and use the search tool with a concrete `q`."
+            ),
+        ),
+        (
+            "fb_graph2" if has_object else "fb_search2",
+            "Map of locations in the catalog" if has_object else "List open circuits by status",
+            "Use list_location_hierarchy; if any locations have coordinates, show a `map` block. "
+            "If none have coordinates, say that clearly."
+            if has_object
+            else (
+                "Run catalog_breakdown with query Circuit/status and summarize how many circuits are in each status."
+            ),
+        ),
+    ]
+
+    s1 = stat_variants[h % len(stat_variants)]
+    s2 = breakdown_variants[(h // 3) % len(breakdown_variants)]
+    s3 = third_variants[(h // 7) % len(third_variants)]
+    core = [
+        {"id": s1[0], "label": s1[1], "prompt": s1[2]},
+        {"id": s2[0], "label": s2[1], "prompt": s2[2]},
+        {"id": s3[0], "label": s3[1], "prompt": s3[2]},
+    ]
+    r = h % 3
+    return [core[(r + i) % 3] for i in range(3)]
+
+
 @router.post("/copilot/suggest_next_steps")
 def post_suggest_next_steps(
     body: Annotated[dict[str, Any], Body(...)],
@@ -402,9 +487,9 @@ def post_suggest_next_steps(
     auth: AuthContext | None = Depends(get_auth),
 ) -> dict[str, Any]:
     """
-    LLM-generated 3 “where to go next” chip options: current app page (server-enriched),
-    plus recent chat, returned as { suggestions: [ { id, label, prompt } x 3 ] }.
-    If LLM is not configured, returns { suggestions: [] }.
+    Three “where to go next” chip options: current app page (server-enriched) plus recent chat.
+    Uses the LLM when configured; otherwise (or if the model returns empty or unparseable JSON) returns
+    deterministic `suggestions` so the UI always has follow-ups to show.
     """
     ctx = require_auth_ctx(auth)
     org = _org(db, ctx)
@@ -421,15 +506,15 @@ def post_suggest_next_steps(
             c = m.get("content")
             if role in ("user", "assistant") and isinstance(c, str) and c.strip():
                 umsgs.append({"role": str(role), "content": c.strip()})
-    eff = get_effective_llm_for_runtime(org)
-    if not eff.get("enabled") or not eff.get("baseUrl") or not eff.get("apiKey"):
-        return {"suggestions": []}
     page_s = _enrich_page_for_next_steps(
         db,
         ctx.organization.id,
         page_ctx if isinstance(page_ctx, dict) else None,
     )
     chat_t = _format_messages_for_next_steps(umsgs)
+    eff = get_effective_llm_for_runtime(org)
+    if not eff.get("enabled") or not eff.get("baseUrl") or not eff.get("apiKey"):
+        return {"suggestions": _fallback_suggest_next_steps(page_s, chat_t)}
     out = run_suggest_next_steps(
         str(eff["baseUrl"]),
         str(eff["apiKey"]),
@@ -437,6 +522,8 @@ def post_suggest_next_steps(
         page_s,
         chat_t,
     )
+    if not out:
+        out = _fallback_suggest_next_steps(page_s, chat_t)
     return {"suggestions": out}
 
 

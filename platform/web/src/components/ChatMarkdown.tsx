@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { Components } from "react-markdown";
-import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
+import L from "leaflet";
+import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
 import ReactMarkdown from "react-markdown";
 import "leaflet/dist/leaflet.css";
 import {
@@ -37,7 +39,8 @@ type ChartSpec = {
 
 type MapSpec = {
   v?: number;
-  center: [number, number];
+  /** Optional when `markers` has at least one point; UI will frame markers. */
+  center?: [number, number];
   zoom?: number;
   title?: string;
   markers?: Array<{ lat: number; lng: number; label?: string }>;
@@ -69,19 +72,132 @@ function parseChartSpec(raw: string): ChartSpec | null {
   }
 }
 
+/** Coerce JSON / LLM output numbers (including numeric strings) to a finite number or null. */
+function parseCoordComponent(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const t = v.trim().replace(/,/g, "");
+    if (!t) return null;
+    const n = Number.parseFloat(t);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function isValidLatLon(a: number, b: number): boolean {
+  return Math.abs(a) <= 90 && Math.abs(b) <= 180;
+}
+
+/**
+ * One map marker from flexible shapes: { lat, lng } | { latitude, longitude } | { coordinates: [a,b] } | string coords.
+ */
+function parseMapMarkerObject(m: unknown): { lat: number; lng: number; label?: string } | null {
+  if (!m || typeof m !== "object" || Array.isArray(m)) return null;
+  const rec = m as Record<string, unknown>;
+  let lat = parseCoordComponent(rec.lat ?? rec.latitude);
+  let lng = parseCoordComponent(rec.lng ?? rec.longitude ?? rec.lon ?? rec.long);
+  if (lat == null || lng == null) {
+    const c = rec.coordinates ?? rec.coord ?? rec.position;
+    if (Array.isArray(c) && c.length >= 2) {
+      lat = parseCoordComponent(c[0]);
+      lng = parseCoordComponent(c[1]);
+    } else if (c && typeof c === "object" && !Array.isArray(c)) {
+      const p = c as Record<string, unknown>;
+      lat = parseCoordComponent(p.lat ?? p.latitude);
+      lng = parseCoordComponent(p.lng ?? p.longitude ?? p.lon);
+    }
+  }
+  if (lat == null || lng == null || !isValidLatLon(lat, lng)) return null;
+  const label =
+    rec.label != null
+      ? String(rec.label)
+      : rec.name != null
+        ? String(rec.name)
+        : rec.title != null
+          ? String(rec.title)
+          : undefined;
+  return { lat, lng, label };
+}
+
+/** Parse map JSON; tolerate ``` fences, leading prose, and alternate top-level array keys. */
+function parseMapJsonObject(raw: string): Record<string, unknown> | null {
+  const t0 = raw.trim();
+  if (!t0) return null;
+  const tryParse = (s: string): Record<string, unknown> | null => {
+    try {
+      const v = JSON.parse(s) as unknown;
+      if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
+      if (Array.isArray(v) && v.length > 0) return { markers: v };
+      return null;
+    } catch {
+      return null;
+    }
+  };
+  let o = tryParse(t0);
+  if (o) return o;
+  const fence = t0.match(/```(?:json|map)?\s*([\s\S]*?)```/i);
+  if (fence?.[1]) o = tryParse(fence[1].trim());
+  if (o) return o;
+  const start = t0.indexOf("{");
+  const end = t0.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    o = tryParse(t0.slice(start, end + 1).trim());
+    if (o) return o;
+  }
+  return null;
+}
+
+function parseMapCenter(o: Record<string, unknown>): [number, number] | undefined {
+  const c = o.center;
+  if (Array.isArray(c) && c.length === 2) {
+    const a = parseCoordComponent(c[0]);
+    const b = parseCoordComponent(c[1]);
+    if (a != null && b != null && isValidLatLon(a, b)) return [a, b];
+  }
+  if (c && typeof c === "object" && !Array.isArray(c)) {
+    const r = c as Record<string, unknown>;
+    const a = parseCoordComponent(r.lat ?? r.latitude);
+    const b = parseCoordComponent(r.lng ?? r.longitude ?? r.lon ?? r.long);
+    if (a != null && b != null && isValidLatLon(a, b)) return [a, b];
+  }
+  return undefined;
+}
+
 function parseMapSpec(raw: string): MapSpec | null {
   const t = raw.trim();
   if (!t) return null;
-  try {
-    const o = JSON.parse(t) as MapSpec;
-    if (!o || !Array.isArray(o.center) || o.center.length !== 2) return null;
-    const [a, b] = o.center;
-    if (typeof a !== "number" || typeof b !== "number" || !Number.isFinite(a) || !Number.isFinite(b)) return null;
-    if (Math.abs(a) > 90 || Math.abs(b) > 180) return null;
-    return o;
-  } catch {
-    return null;
+  const o = parseMapJsonObject(t);
+  if (!o) return null;
+  const rawList =
+    o.markers ??
+    o.points ??
+    o.places ??
+    o.locations ??
+    (Array.isArray(o["data"]) ? o["data"] : undefined);
+  const rawMarks = Array.isArray(rawList) ? rawList : [];
+  const markers: Array<{ lat: number; lng: number; label?: string }> = [];
+  for (const m of rawMarks) {
+    const pm = parseMapMarkerObject(m);
+    if (pm) markers.push(pm);
   }
+  let center: [number, number] | undefined = parseMapCenter(o);
+  if (!center && markers.length > 0) {
+    const sum = markers.reduce(
+      (acc, m) => [acc[0] + m.lat, acc[1] + m.lng] as [number, number],
+      [0, 0] as [number, number],
+    );
+    center = [sum[0] / markers.length, sum[1] / markers.length];
+  }
+  if (!center) return null;
+  const title = o.title != null ? String(o.title) : undefined;
+  const zoom = typeof o.zoom === "number" && Number.isFinite(o.zoom) ? o.zoom : undefined;
+  return {
+    v: typeof o.v === "number" ? o.v : undefined,
+    center,
+    zoom,
+    title,
+    markers: markers.length > 0 ? markers : undefined,
+  };
 }
 
 function parseProposalSpec(raw: string): ProposalSpec | null {
@@ -199,12 +315,70 @@ function ChartFromSpec({ spec }: { spec: ChartSpec }) {
   );
 }
 
+/** After mount, zoom/pan to show all markers (fixes continent-scale default when the model picks zoom 3). */
+function MapFitBounds({ points, boundsKey }: { points: [number, number][]; boundsKey: string }) {
+  const map = useMap();
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
+
+  useEffect(() => {
+    const pts = pointsRef.current;
+    if (pts.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      const p = pointsRef.current;
+      if (p.length === 0) return;
+      if (p.length === 1) {
+        map.setView(p[0], 12, { animate: false });
+        map.invalidateSize();
+        return;
+      }
+      const latLngs = p.map((q) => L.latLng(q[0], q[1]));
+      const b = L.latLngBounds(latLngs);
+      if (!b.isValid()) {
+        map.setView(p[0], 12, { animate: false });
+        map.invalidateSize();
+        return;
+      }
+      const ne = b.getNorthEast();
+      const sw = b.getSouthWest();
+      const samePoint = ne.lat === sw.lat && ne.lng === sw.lng;
+      if (samePoint) {
+        map.setView(p[0], 14, { animate: false });
+      } else {
+        map.fitBounds(b, { padding: [32, 32], maxZoom: 16, animate: false });
+      }
+      map.invalidateSize();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [map, boundsKey]);
+
+  return null;
+}
+
+
 function MapFromSpec({ spec }: { spec: MapSpec }) {
-  const zoom = Math.min(18, Math.max(1, spec.zoom ?? 3));
-  const [lat, lon] = spec.center;
-  const marks = (spec.markers || []).filter(
-    (m) => typeof m.lat === "number" && typeof m.lng === "number" && Number.isFinite(m.lat) && Number.isFinite(m.lng)
+  const marks = useMemo(() => {
+    return (spec.markers || []).filter(
+      (m) => typeof m.lat === "number" && typeof m.lng === "number" && Number.isFinite(m.lat) && Number.isFinite(m.lng)
+    );
+  }, [spec.markers]);
+  const positions: [number, number][] = useMemo(() => marks.map((m) => [m.lat, m.lng] as [number, number]), [marks]);
+  const boundsKey = useMemo(
+    () =>
+      [...positions]
+        .map((p) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`)
+        .sort()
+        .join("|"),
+    [positions]
   );
+
+  const zoom = Math.min(18, Math.max(1, spec.zoom ?? 3));
+  const center = spec.center;
+  if (!center) {
+    return <div className="ai-assistant-chart-err">Map is missing a valid center or markers.</div>;
+  }
+  const [lat, lon] = center;
+
   return (
     <div className="ai-assistant-map-wrap">
       {spec.title ? <div className="ai-assistant-map-title">{spec.title}</div> : null}
@@ -212,12 +386,23 @@ function MapFromSpec({ spec }: { spec: MapSpec }) {
         <MapContainer
           center={[lat, lon] as [number, number]}
           zoom={zoom}
-          style={{ width: "100%", height: 200, borderRadius: 8, zIndex: 0 }}
+          style={{ width: "100%", height: 240, borderRadius: 8, zIndex: 0 }}
           scrollWheelZoom={false}
         >
-          <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          {positions.length > 0 ? <MapFitBounds points={positions} boundsKey={boundsKey} /> : null}
           {marks.map((m, i) => (
-            <CircleMarker key={i} center={[m.lat, m.lng] as [number, number]} radius={6} pathOptions={{ color: "var(--accent)", fillColor: "var(--accent)", fillOpacity: 0.55 }}>
+            <CircleMarker
+              key={i}
+              center={[m.lat, m.lng] as [number, number]}
+              radius={9}
+              pathOptions={{
+                color: "#0d0d0f",
+                weight: 2,
+                fillColor: "var(--accent)",
+                fillOpacity: 0.9,
+              }}
+            >
               {m.label ? <Popup>{m.label}</Popup> : null}
             </CircleMarker>
           ))}
@@ -282,7 +467,12 @@ function makeComponents(): Partial<Components> {
       if (className?.includes("language-map")) {
         const sp = parseMapSpec(raw);
         if (sp) return <MapFromSpec spec={sp} />;
-        return <div className="ai-assistant-chart-err">Could not render map. Expect JSON with center [lat,lon] and optional markers.</div>;
+        return (
+          <div className="ai-assistant-chart-err">
+            Could not render map. Use JSON with a markers array (lat, lng) and optional title; center is optional
+            if markers are present (the view zooms to fit all markers).
+          </div>
+        );
       }
       if (className?.includes("language-proposal")) {
         const sp = parseProposalSpec(raw);

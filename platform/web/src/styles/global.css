@@ -2591,12 +2591,12 @@ tr.data-row-clickable:hover td {
   background: transparent;
   box-shadow: none;
   min-height: 2.4rem;
-  max-height: 7rem;
   padding: 0.25rem 0.1rem 0.15rem 0.15rem;
-  resize: vertical;
+  resize: none;
   line-height: 1.4;
   font-size: 0.9rem;
   width: 100%;
+  overflow-x: hidden;
 }
 .ai-assistant-composer .ai-assistant-input::placeholder {
   color: var(--text-low);
@@ -2623,7 +2623,7 @@ tr.data-row-clickable:hover td {
 .ai-assistant-input {
   width: 100%;
   min-height: 2.4rem;
-  resize: vertical;
+  resize: none;
   font-family: inherit;
   border-radius: 6px;
 }
