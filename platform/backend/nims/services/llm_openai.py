@@ -46,6 +46,13 @@ def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
         "rows for generic words like 'device' if no object name contains that substring. For totals, use "
         "`inventory_stats`, not `search`.\n"
         "- **One object by type and id:** use `get_resource_view` or `get_resource_graph`.\n"
+        "- **Full location tree / parent-child / map:** use `list_location_hierarchy` to get every location’s id, name, "
+        "`parentId`, and any **latitude/longitude** in the data. Format an indented tree in Markdown, or a **map** "
+        "(fenced `map` JSON with center and markers for rows that have coordinates). If `locationsWithCoordinates` is "
+        "0, say coordinates are not set in the catalog rather than that the tool omits them.\n"
+        "- **Device counts by group (aggregates for charts):** use `device_count_breakdown` with `group_by` = "
+        "`location` (devices per site), `device_type` (manufacturer+model), `device_role`, or `status`. Use the "
+        "returned `rows` for tables and `chart` blocks. Do not say you lack breakdown tools without calling this.\n"
         "- **Proposed changes (read-only):** to describe planned writes for human review, use the `propose_change_preview` "
         "tool. It never mutates data; it returns a preview with current snapshots. Do not claim a change was applied.\n"
         "When you reference results, give object type, id, and a path like /o/Type/<uuid>. Be concise. English only. "
@@ -288,6 +295,50 @@ def _append_assistant_and_tool_results(
         )
 
 
+def _recover_nonempty_assistant_reply(
+    client: httpx.Client,
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict[str, Any]],
+) -> str | None:
+    """
+    Text-only follow-up (no tools) if the main completion returned empty text — reduces 'No content from model'
+    on some providers for very short or ambiguous user turns.
+    """
+    nudge: list[dict[str, Any]] = list(messages)
+    nudge.append(
+        {
+            "role": "user",
+            "content": (
+                "Your previous reply was empty, which is not allowed. Respond with 1–3 short sentences in English. "
+                "If the user is testing the chat, greet them and offer to help with inventory, DCIM, or search."
+            ),
+        }
+    )
+    body: dict[str, Any] = {
+        "messages": nudge,
+        "max_tokens": 400,
+        "temperature": 0.45,
+    }
+    if use_model_in_request_body(base_url):
+        body["model"] = model
+    url = chat_completions_url(base_url, deployment=model)
+    if not url:
+        return None
+    r = client.post(
+        url,
+        headers=llm_request_headers(base_url, api_key),
+        json=body,
+    )
+    if r.status_code >= 400:
+        return None
+    raw_msg = (r.json().get("choices") or [{}])[0].get("message") or {}
+    t = _assistant_message_text(raw_msg) if isinstance(raw_msg, dict) else ""
+    s = (t or "").strip()
+    return s or None
+
+
 def _one_completion_non_streaming(
     client: httpx.Client,
     base_url: str,
@@ -433,8 +484,13 @@ def iter_copilot_chat_sse(
                 for ev in _fake_deltas_for_text(final, 64):
                     yield ev
                 if not final.strip():
-                    error_bump()
-                    yield {"type": "error", "message": "No content from model."}
+                    recovered2 = _recover_nonempty_assistant_reply(client, base_url, api_key, model, messages)
+                    if recovered2:
+                        for ev in _fake_deltas_for_text(recovered2, 64):
+                            yield ev
+                    else:
+                        error_bump()
+                        yield {"type": "error", "message": "No content from model."}
                 yield {"type": "done"}
                 return
             text_joined = "".join(content_parts)
@@ -461,8 +517,13 @@ def iter_copilot_chat_sse(
                     for ev in _fake_deltas_for_text(recovered, 64):
                         yield ev
                 else:
-                    error_bump()
-                    yield {"type": "error", "message": "No content from model."}
+                    recovered2 = _recover_nonempty_assistant_reply(client, base_url, api_key, model, messages)
+                    if recovered2:
+                        for ev in _fake_deltas_for_text(recovered2, 64):
+                            yield ev
+                    else:
+                        error_bump()
+                        yield {"type": "error", "message": "No content from model."}
                 yield {"type": "done"}
                 return
             if fr2 == "tool_calls" or has_tools:
@@ -478,8 +539,13 @@ def iter_copilot_chat_sse(
                 _append_assistant_and_tool_results(db, ctx, messages, a_msg)
                 continue
             if not (text_joined or "").strip():
-                error_bump()
-                yield {"type": "error", "message": "No content from model."}
+                recovered2 = _recover_nonempty_assistant_reply(client, base_url, api_key, model, messages)
+                if recovered2:
+                    for ev in _fake_deltas_for_text(recovered2, 64):
+                        yield ev
+                else:
+                    error_bump()
+                    yield {"type": "error", "message": "No content from model."}
             yield {"type": "done"}
             return
         error_bump()
@@ -515,7 +581,10 @@ def run_copilot_chat(
             if tcs:
                 _append_assistant_and_tool_results(db, ctx, messages, msg)
                 continue
-            final = _assistant_message_text(msg).strip() or "No content from model."
+            final = _assistant_message_text(msg).strip()
+            if not final:
+                r2 = _recover_nonempty_assistant_reply(client, base_url, api_key, model, messages)
+                final = (r2 or "").strip() or "No content from model."
             if final == "No content from model.":
                 error_bump()
             return final
@@ -666,7 +735,7 @@ def run_suggest_next_steps(
     system = (
         "You are helping users navigate the IntentCenter DCIM/inventory web app. "
         "The assistant can use tools: search, inventory_stats, get_resource_view, get_resource_graph, "
-        "propose_change_preview. "
+        "list_location_hierarchy, device_count_breakdown, propose_change_preview. "
         "Propose exactly 3 different, concrete next questions or actions the user could take, "
         "informed by the app page/screen and the recent chat. "
         "Vary the intent (e.g. counts vs search vs relationships vs next object). "

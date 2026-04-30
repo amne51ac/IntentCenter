@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from nims.auth_context import AuthContext
 from nims.models_generated import Circuit, Device, IpAddress, Location, Prefix, Provider, Rack, Vrf
+from nims.services.copilot_aggregates import device_breakdown_json, location_hierarchy_json
 from nims.services.device_hardware import build_device_hardware_tree
 from nims.services.global_search import global_search_items
 from nims.services.llm_metrics import bump as _metrics_bump
@@ -143,6 +144,44 @@ OPENAI_TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "resource_id": {"type": "string"},
                 },
                 "required": ["resource_type", "resource_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_location_hierarchy",
+            "description": (
+                "List **all** non-deleted locations: id, name, parentId, slug, and when stored in DCIM, **latitude and "
+                "longitude** (WGS84) plus hasCoordinates. Use for an indented tree, or for a geographic **map** in "
+                "the chat (Markdown `map` code fence with center + markers) when some rows have coordinates. "
+                "Read-only; does not return devices."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "device_count_breakdown",
+            "description": (
+                "**Grouped device counts** for the organization (read-only, suitable for tables and `chart` blocks in Markdown). "
+                "Use for: devices per location, per device type (manufacturer+model), per device role, or by device status. "
+                "This replaces guessing from search, which is substring-based and not an aggregate report."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "group_by": {
+                        "type": "string",
+                        "enum": ["location", "device_type", "device_role", "status"],
+                        "description": "location: count devices at each site (devices in racks; unplaced in 'Unplaced'). device_type: per hardware type. device_role: per role name. status: per lifecycle status.",
+                    }
+                },
+                "required": ["group_by"],
             },
         },
     },
@@ -294,6 +333,15 @@ def execute_copilot_tool(
         if g is None:
             return json.dumps({"error": "Object not found or graph not available"})
         return _clip(json.dumps(g, default=str))
+
+    if name == "list_location_hierarchy":
+        return _clip(location_hierarchy_json(db, oid))
+
+    if name == "device_count_breakdown":
+        gb = str(arguments.get("group_by", "") or "").strip()
+        if not gb:
+            return json.dumps({"error": "group_by is required", "enum": ["location", "device_type", "device_role", "status"]})
+        return _clip(device_breakdown_json(db, oid, gb))
 
     if name == "propose_change_preview":
         summary = str(arguments.get("summary", ""))[:4000]
