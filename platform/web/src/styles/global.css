@@ -2426,6 +2426,67 @@ tr.data-row-clickable:hover td {
   font-size: 0.82rem;
   margin: 0.25rem 0;
 }
+.ai-assistant-map-wrap {
+  margin: 0.4rem 0 0.15rem;
+  width: 100%;
+  max-width: 100%;
+}
+.ai-assistant-map-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0 0 0.2rem;
+}
+.ai-assistant-map-canvas .leaflet-container {
+  font-family: inherit;
+  background: var(--bg-elevated);
+}
+.ai-assistant-proposal-wrap {
+  margin: 0.4rem 0;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid rgba(90, 163, 135, 0.35);
+  border-radius: var(--radius);
+  background: rgba(90, 163, 135, 0.06);
+  font-size: 0.82rem;
+}
+.ai-assistant-proposal-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+.ai-assistant-proposal-summary {
+  color: var(--text-body);
+  margin-bottom: 0.35rem;
+  line-height: 1.4;
+}
+.ai-assistant-proposal-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-body);
+}
+.ai-assistant-proposal-action {
+  font-weight: 600;
+  color: var(--text-heading);
+  text-transform: capitalize;
+}
+.ai-assistant-proposal-target {
+  color: var(--text-low);
+  font-size: 0.78rem;
+}
+.ai-assistant-proposal-rationale {
+  margin-top: 0.15rem;
+  color: var(--text-body);
+  font-size: 0.8rem;
+}
+.ai-assistant-proposal-foot {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--text-low);
+}
 .ai-assistant-next-steps {
   flex-shrink: 0;
   margin-bottom: 0.75rem;

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from collections.abc import Iterator
 from typing import Any
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from nims.auth_context import AuthContext
 from nims.services.copilot_tools import OPENAI_TOOL_DEFINITIONS, execute_copilot_tool
+from nims.services.llm_metrics import error_bump
 from nims.services.llm_url import (
     chat_completions_url,
     is_azure_openai_host,
@@ -21,7 +23,12 @@ from nims.services.llm_url import (
 
 log = logging.getLogger(__name__)
 
-_MAX_ROUNDS = 6
+def _rounds() -> int:
+    try:
+        n = int(os.environ.get("COPILOT_MAX_TOOL_ROUNDS", "12").strip() or "12")
+    except (TypeError, ValueError):
+        return 12
+    return max(1, min(n, 64))
 
 
 def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
@@ -30,6 +37,8 @@ def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
     return (
         "You are the Intent Center AI assistant for DCIM and network inventory. Use tools to obtain facts; do not "
         "invent counts, UUIDs, or object details.\n"
+        "- **Tool rounds:** You may use **several** tools in a row across multiple turns. Prefer gathering enough "
+        "read-only data before you answer, rather than stopping after the first result.\n"
         "- **Counts and 'how many' questions:** use the `inventory_stats` tool. It returns non-deleted object "
         "counts in the current organization. Pass `resource_type` (e.g. Device) to count one type, or omit it for all types.\n"
         "- **Finding objects by name, IP, CIDR, or identifier:** use `search` with a concrete `q` string. "
@@ -37,11 +46,18 @@ def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
         "rows for generic words like 'device' if no object name contains that substring. For totals, use "
         "`inventory_stats`, not `search`.\n"
         "- **One object by type and id:** use `get_resource_view` or `get_resource_graph`.\n"
+        "- **Proposed changes (read-only):** to describe planned writes for human review, use the `propose_change_preview` "
+        "tool. It never mutates data; it returns a preview with current snapshots. Do not claim a change was applied.\n"
         "When you reference results, give object type, id, and a path like /o/Type/<uuid>. Be concise. English only. "
-        "You cannot change inventory; read-only tools only.\n"
-        "- **Formatting:** Reply in **Markdown** (headings, lists, tables, bold). For a simple chart, use a fenced block "
-        "with language `chart` and a single JSON line or object. Schema: v=1, kind: \"bar\"|\"line\", title (string), "
-        "xKey, yKey, data: array of objects. Only add charts for numbers you got from tools or the user, not made-up data.\n\n"
+        "The only write proposal path is the preview tool; you cannot call mutating APIs.\n"
+        "- **Formatting:** Reply in **Markdown** (headings, lists, tables, bold). For a **chart**, use a fenced block "
+        "with language `chart` and a single JSON object. Schemas: (1) bar/line/area: v=1, kind, title, xKey, yKey, data. "
+        "(2) pie: kind \"pie\", nameKey, valueKey, data. Only add charts for numbers you got from tools or the user, "
+        "not made-up data. For a **change-plan card** the user can scan, you may use a fenced block with language "
+        "`proposal` and JSON: {v:1, summary, changes: [{action, resource_type, resource_id?, rationale?}]}. "
+        "For a small **geographic** map, use a fenced block with language `map` and JSON: "
+        "{v:1, center: [lat, lon], zoom (number, e.g. 2–10), title (optional), "
+        "markers: [{ lat, lon, label (optional) }]} — only when coordinates or locations are from tools or the user.\n\n"
         f"{_ctx(page_context)}"
     )
 
@@ -299,6 +315,7 @@ def _one_completion_non_streaming(
     )
     if r.status_code >= 400:
         log.warning("llm error %s: %s", r.status_code, r.text[:500])
+        error_bump()
         return _llm_config_error_text(base_url, r.status_code)
     return r.json()
 
@@ -324,12 +341,13 @@ def iter_copilot_chat_sse(
     """
     init = _init_copilot_messages(user_messages, page_context)
     if isinstance(init, str):
+        # User-side validation (e.g. empty turn); not counted as an LLM failure.
         yield {"type": "error", "message": init}
         yield {"type": "done"}
         return
     messages = list(init)
     with httpx.Client(timeout=httpx.Timeout(120.0, connect=20.0)) as client:
-        for _ in range(_MAX_ROUNDS):
+        for _ in range(_rounds()):
             sbody: dict[str, Any] = {
                 "messages": messages,
                 "tools": OPENAI_TOOL_DEFINITIONS,
@@ -340,6 +358,7 @@ def iter_copilot_chat_sse(
                 sbody["model"] = model
             url = chat_completions_url(base_url, deployment=model)
             if not url:
+                error_bump()
                 msg = (
                     "LLM is misconfigured: for Azure OpenAI, set a default model / deployment name "
                     "(e.g. your deployment in Azure) and a base URL like https://<resource>.openai.azure.com"
@@ -363,6 +382,7 @@ def iter_copilot_chat_sse(
                         log.warning("llm stream HTTP %s; trying non-streaming for this round", r.status_code)
                         ns = _one_completion_non_streaming(client, base_url, api_key, model, messages)
                         if isinstance(ns, str):
+                            error_bump()
                             yield {"type": "error", "message": ns}
                             yield {"type": "done"}
                             return
@@ -384,6 +404,7 @@ def iter_copilot_chat_sse(
                                 continue
                             piece, tcd_list, fr_stream, stream_err = _openai_stream_chunk_to_text_and_tools(chunk)
                             if stream_err:
+                                error_bump()
                                 yield {"type": "error", "message": stream_err}
                                 yield {"type": "done"}
                                 return
@@ -396,6 +417,7 @@ def iter_copilot_chat_sse(
                                 _merge_stream_tool_block(tool_blocks, tcd)
             except httpx.ReadError as e:
                 log.warning("llm stream read: %s", e)
+                error_bump()
                 yield {"type": "error", "message": f"LLM stream interrupted: {e!s}."}
                 yield {"type": "done"}
                 return
@@ -411,6 +433,7 @@ def iter_copilot_chat_sse(
                 for ev in _fake_deltas_for_text(final, 64):
                     yield ev
                 if not final.strip():
+                    error_bump()
                     yield {"type": "error", "message": "No content from model."}
                 yield {"type": "done"}
                 return
@@ -423,6 +446,7 @@ def iter_copilot_chat_sse(
             if not (text_joined or "").strip() and fr2 != "tool_calls" and not has_tools:
                 ns_rec = _one_completion_non_streaming(client, base_url, api_key, model, messages)
                 if isinstance(ns_rec, str):
+                    error_bump()
                     yield {"type": "error", "message": ns_rec}
                     yield {"type": "done"}
                     return
@@ -437,6 +461,7 @@ def iter_copilot_chat_sse(
                     for ev in _fake_deltas_for_text(recovered, 64):
                         yield ev
                 else:
+                    error_bump()
                     yield {"type": "error", "message": "No content from model."}
                 yield {"type": "done"}
                 return
@@ -453,9 +478,11 @@ def iter_copilot_chat_sse(
                 _append_assistant_and_tool_results(db, ctx, messages, a_msg)
                 continue
             if not (text_joined or "").strip():
+                error_bump()
                 yield {"type": "error", "message": "No content from model."}
             yield {"type": "done"}
             return
+        error_bump()
         yield {"type": "error", "message": "Tool round limit reached. Try a narrower question."}
         yield {"type": "done"}
 
@@ -478,7 +505,7 @@ def run_copilot_chat(
     messages = init
 
     with httpx.Client(timeout=httpx.Timeout(120.0, connect=20.0)) as client:
-        for _round_n in range(_MAX_ROUNDS):
+        for _round_n in range(_rounds()):
             data = _one_completion_non_streaming(client, base_url, api_key, model, messages)
             if isinstance(data, str):
                 return data
@@ -488,7 +515,11 @@ def run_copilot_chat(
             if tcs:
                 _append_assistant_and_tool_results(db, ctx, messages, msg)
                 continue
-            return _assistant_message_text(msg).strip() or "No content from model."
+            final = _assistant_message_text(msg).strip() or "No content from model."
+            if final == "No content from model.":
+                error_bump()
+            return final
+        error_bump()
         return "Tool round limit reached. Try a narrower question."
 
 
@@ -634,7 +665,8 @@ def run_suggest_next_steps(
         return []
     system = (
         "You are helping users navigate the IntentCenter DCIM/inventory web app. "
-        "The assistant can use tools: search, inventory_stats, get_resource_view, get_resource_graph. "
+        "The assistant can use tools: search, inventory_stats, get_resource_view, get_resource_graph, "
+        "propose_change_preview. "
         "Propose exactly 3 different, concrete next questions or actions the user could take, "
         "informed by the app page/screen and the recent chat. "
         "Vary the intent (e.g. counts vs search vs relationships vs next object). "
@@ -669,3 +701,160 @@ def run_suggest_next_steps(
         if not raw:
             return []
         return _parse_next_steps_json(str(raw))
+
+
+def run_text_completion(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict[str, str]],
+    max_tokens: int = 4096,
+    temperature: float = 0.2,
+) -> str | None:
+    """
+    No tools. For internal/extension callers. Returns None on transport or HTTP error;
+    the caller can record `error_bump()` if they treat that as a failure.
+    """
+    clean: list[dict[str, str]] = []
+    for m in messages[-40:]:
+        if not isinstance(m, dict):
+            continue
+        r = m.get("role", "")
+        c = m.get("content", "")
+        if r not in ("system", "user", "assistant") or not isinstance(c, str):
+            continue
+        clean.append({"role": r, "content": c})
+    if not any(m.get("role") == "user" for m in clean):
+        return None
+    url = chat_completions_url(base_url, deployment=model)
+    if not url:
+        return None
+    jbody: dict[str, Any] = {
+        "messages": clean,
+        "max_tokens": max(64, min(max_tokens, 64_000)),
+        "temperature": min(2.0, max(0.0, float(temperature))),
+    }
+    if use_model_in_request_body(base_url):
+        jbody["model"] = model
+    with httpx.Client(timeout=httpx.Timeout(120.0, connect=20.0)) as client:
+        r = client.post(
+            url,
+            headers=llm_request_headers(base_url, api_key),
+            json=jbody,
+        )
+        if r.status_code >= 400:
+            return None
+        out = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
+        return str(out).strip() if out else None
+
+
+def _parse_column_mapping_result(text: str) -> dict[str, Any] | None:
+    t = (text or "").strip()
+    if t.startswith("```"):
+        parts = t.split("```", 2)
+        if len(parts) >= 2:
+            t = parts[1]
+            if t.lower().startswith("json"):
+                t = t[4:].lstrip()
+    t = t.strip()
+    start = t.find("{")
+    if start < 0:
+        return None
+    for cut in (t[start:], t):
+        try:
+            o = json.loads(cut)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(o, dict) and "columnMapping" in o and isinstance(o.get("columnMapping"), dict):
+            return o
+        if isinstance(o, dict) and "mappings" in o and isinstance(o.get("mappings"), dict):
+            return {"columnMapping": o["mappings"], "notes": o.get("notes")}
+    return None
+
+
+def run_import_column_mapping(
+    base_url: str,
+    api_key: str,
+    model: str,
+    target_resource_type: str,
+    columns: list[str],
+    sample_rows: list[dict[str, str]],
+) -> dict[str, Any] | None:
+    t_rt = (target_resource_type or "").strip()[:120]
+    cols = [str(c)[:200] for c in columns if str(c).strip()][:80]
+    rows = sample_rows[:20]
+    system = (
+        "You map incoming spreadsheet/CSV column headers to a target resource type. "
+        "Output valid JSON only, no markdown, with this form:\n"
+        '{"columnMapping": {"<column header>": "<logical field or attribute name>"}, '
+        '"unmapped": ["<column>"], "notes": "<short confidence notes>"}.\n'
+        "Map only columns you can reason about; list uncertain columns in unmapped."
+    )
+    user_c = f"Target resource type: {t_rt}\n\n## Columns\n{json.dumps(cols)[:12_000]}\n\n## Sample rows (objects)\n{json.dumps(rows, default=str)[:20_000]}\n"  # noqa: E501
+    url = chat_completions_url(base_url, deployment=model)
+    if not url:
+        return None
+    jbody: dict[str, Any] = {
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_c},
+        ],
+        "max_tokens": 1800,
+        "temperature": 0.1,
+    }
+    if use_model_in_request_body(base_url):
+        jbody["model"] = model
+    with httpx.Client(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
+        r = client.post(
+            url,
+            headers=llm_request_headers(base_url, api_key),
+            json=jbody,
+        )
+        if r.status_code >= 400:
+            return None
+        raw = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
+        if not raw:
+            return None
+        return _parse_column_mapping_result(str(raw))
+
+
+def run_ticket_triage_summary(
+    base_url: str,
+    api_key: str,
+    model: str,
+    pasted: str,
+    triage_hits: dict[str, Any],
+) -> str | None:
+    p = (pasted or "").strip()[:24_000]
+    hits = json.dumps(triage_hits, default=str)[:20_000]
+    system = (
+        "You summarize a pasted support ticket for a DCIM and network inventory operator. "
+        "Be practical: what was extracted, which inventory search hits are relevant, what to check next. "
+        "3–6 short bullet points, Markdown, English. Do not invent data not in the input."
+    )
+    user_c = f"## Pasted text\n{p}\n\n## Extracted / search (JSON)\n{hits}\n"
+    url = chat_completions_url(base_url, deployment=model)
+    if not url:
+        return None
+    jbody: dict[str, Any] = {
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_c},
+        ],
+        "max_tokens": 800,
+        "temperature": 0.25,
+    }
+    if use_model_in_request_body(base_url):
+        jbody["model"] = model
+    with httpx.Client(timeout=httpx.Timeout(45.0, connect=10.0)) as client:
+        r = client.post(
+            url,
+            headers=llm_request_headers(base_url, api_key),
+            json=jbody,
+        )
+        if r.status_code >= 400:
+            return None
+        raw = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
+        if not raw:
+            return None
+        return str(raw).strip() or None

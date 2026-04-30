@@ -13,6 +13,7 @@ from nims.auth_context import AuthContext
 from nims.models_generated import Circuit, Device, IpAddress, Location, Prefix, Provider, Rack, Vrf
 from nims.services.device_hardware import build_device_hardware_tree
 from nims.services.global_search import global_search_items
+from nims.services.llm_metrics import bump as _metrics_bump
 from nims.services.resource_item import load_resource_item
 from nims.services.resource_relationships import build_relationship_graph
 
@@ -145,6 +146,51 @@ OPENAI_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "propose_change_preview",
+            "description": (
+                "Propose a batch of intended **writes** for **human review only**. Does **not** modify any data. "
+                "Call this when the user wants to plan updates, creates, or archive actions. "
+                "The response includes current object snapshots and your proposed `field_deltas` for each change, "
+                "if you supplied a `resource_id` the user can see what would be affected."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "summary": {
+                        "type": "string",
+                        "description": "One-paragraph description of the overall plan.",
+                    },
+                    "changes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {
+                                    "type": "string",
+                                    "enum": ["update", "create", "archive"],
+                                },
+                                "resource_type": {"type": "string", "description": "e.g. Device, Location"},
+                                "resource_id": {
+                                    "type": "string",
+                                    "description": "UUID of the object, when applicable; omit for purely conceptual create.",
+                                },
+                                "rationale": {"type": "string", "description": "Why this change (short)."},
+                                "field_deltas": {
+                                    "type": "object",
+                                    "description": "Suggested field names → proposed values (read-only preview).",
+                                },
+                            },
+                            "required": ["action", "resource_type", "rationale"],
+                        },
+                    },
+                },
+                "required": ["summary", "changes"],
+            },
+        },
+    },
 ]
 
 
@@ -160,6 +206,7 @@ def execute_copilot_tool(
     name: str,
     arguments: dict[str, Any] | str | None,
 ) -> str:
+    _metrics_bump("copilotToolCalls", 1)
     if isinstance(arguments, str):
         try:
             arguments = json.loads(arguments) if arguments.strip() else {}
@@ -247,6 +294,88 @@ def execute_copilot_tool(
         if g is None:
             return json.dumps({"error": "Object not found or graph not available"})
         return _clip(json.dumps(g, default=str))
+
+    if name == "propose_change_preview":
+        summary = str(arguments.get("summary", ""))[:4000]
+        ch_raw = arguments.get("changes")
+        if not isinstance(ch_raw, list):
+            ch_raw = []
+        previews: list[dict[str, Any]] = []
+        for ch in ch_raw:
+            if not isinstance(ch, dict):
+                continue
+            action = str(ch.get("action", "update") or "update").lower()
+            rtype = str(ch.get("resource_type", "") or "").strip()
+            if rtype == "Service":
+                rtype = "ServiceInstance"
+            rationale = str(ch.get("rationale", ""))[:4000]
+            fd = ch.get("field_deltas")
+            if not isinstance(fd, dict):
+                fd = {}
+            rid_s = ch.get("resource_id")
+            if not rid_s:
+                previews.append(
+                    {
+                        "action": action,
+                        "resourceType": rtype,
+                        "rationale": rationale,
+                        "fieldDeltasProposed": fd,
+                        "readOnly": True,
+                        "note": "No resource_id — planning-only until an id is available.",
+                    }
+                )
+                continue
+            try:
+                rid2 = uuid.UUID(str(rid_s).strip())
+            except (ValueError, TypeError):
+                previews.append(
+                    {
+                        "action": action,
+                        "resourceType": rtype,
+                        "rationale": rationale,
+                        "error": "invalid resource_id (expected UUID)",
+                    }
+                )
+                continue
+            if not rtype:
+                previews.append({"error": "resource_type required with resource_id", "resourceId": str(rid2)})
+                continue
+            current = load_resource_item(db, oid, rtype, rid2)
+            if current is None:
+                previews.append(
+                    {
+                        "action": action,
+                        "resourceType": rtype,
+                        "resourceId": str(rid2),
+                        "rationale": rationale,
+                        "fieldDeltasProposed": fd,
+                        "readOnly": True,
+                        "notFound": True,
+                    }
+                )
+            else:
+                previews.append(
+                    {
+                        "action": action,
+                        "resourceType": rtype,
+                        "resourceId": str(rid2),
+                        "rationale": rationale,
+                        "fieldDeltasProposed": fd,
+                        "currentSnapshot": current,
+                        "readOnly": True,
+                    }
+                )
+        return _clip(
+            json.dumps(
+                {
+                    "summary": summary,
+                    "previews": previews,
+                    "readOnly": True,
+                    "disclaimer": "Preview only. No inventory or configuration was written.",
+                },
+                default=str,
+            )
+        )
 
     return json.dumps({"error": f"unknown tool {name}"})
 

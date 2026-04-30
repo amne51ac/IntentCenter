@@ -22,14 +22,18 @@ from nims.services.llm_config import (
     get_effective_llm_for_runtime,
     resolve_llm_for_connection_test,
 )
+from nims.services.llm_metrics import bump, snapshot
 from nims.services.llm_openai import (
     iter_copilot_chat_sse,
     run_copilot_chat,
+    run_import_column_mapping,
     run_suggest_next_steps,
     run_suggestion_titles,
     run_suggest_thread_title,
+    run_ticket_triage_summary,
 )
 from nims.services.resource_item import load_resource_item
+from nims.services.ticket_triage import build_triage_hits
 from nims.services.llm_test import test_openai_chat_minimal
 from nims.timeutil import utc_now
 
@@ -99,6 +103,15 @@ def post_admin_llm_test(
     return {"ok": ok, "message": message}
 
 
+@router.get("/admin/llm/metrics")
+def get_admin_llm_metrics(
+    auth: AuthContext | None = Depends(get_auth),
+) -> dict[str, Any]:
+    """In-process copilot/LLM usage counters (admin only)."""
+    require_admin(require_auth_ctx(auth))
+    return {"metrics": snapshot()}
+
+
 # --- Copilot chat ---
 
 
@@ -135,6 +148,7 @@ def post_copilot_chat(
         content = m.get("content")
         if role in ("user", "assistant") and isinstance(content, str):
             umsgs.append({"role": role, "content": content})
+    bump("copilotChatRequests", 1)
     text = run_copilot_chat(
         db,
         ctx,
@@ -185,6 +199,8 @@ def post_copilot_chat_stream(
         if role in ("user", "assistant") and isinstance(content, str):
             umsgs.append({"role": role, "content": content})
 
+    bump("copilotStreamSessions", 1)
+
     def gen():
         for ev in iter_copilot_chat_sse(
             db,
@@ -208,6 +224,91 @@ def post_copilot_chat_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/copilot/assist/import-mapping")
+def post_copilot_assist_import_mapping(
+    body: Annotated[dict[str, Any], Body(...)],
+    db: Session = Depends(get_db),
+    auth: AuthContext | None = Depends(get_auth),
+) -> dict[str, Any]:
+    """
+    LLM-suggested column mapping for bulk import (read-only: returns JSON only).
+    Body: ``targetResourceType`` (e.g. Device), ``columns`` (string[]), ``sampleRows`` (array of row objects, optional).
+    """
+    ctx = require_auth_ctx(auth)
+    org = _org(db, ctx)
+    eff = get_effective_llm_for_runtime(org)
+    if not eff.get("enabled") or not eff.get("baseUrl") or not eff.get("apiKey"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The AI assistant is not enabled or LLM is not fully configured.",
+        )
+    t_rt = str(body.get("targetResourceType") or body.get("target_resource_type") or "").strip()
+    if not t_rt:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="targetResourceType is required")
+    cols_raw = body.get("columns")
+    if not isinstance(cols_raw, list) or not cols_raw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="columns (non-empty array) is required")
+    cols: list[str] = [str(c) for c in cols_raw if str(c).strip()]
+    srows: list[dict[str, str]] = []
+    sr = body.get("sampleRows") or body.get("sample_rows")
+    if isinstance(sr, list):
+        for row in sr[:20]:
+            if not isinstance(row, dict):
+                continue
+            d: dict[str, str] = {}
+            for k, v in list(row.items())[:80]:
+                if v is None:
+                    continue
+                d[str(k)[:200]] = str(v)[:2000]
+            srows.append(d)
+    bump("importMappingRequests", 1)
+    parsed = run_import_column_mapping(
+        str(eff["baseUrl"]),
+        str(eff["apiKey"]),
+        str(eff.get("defaultModel") or "gpt-4.1-mini"),
+        t_rt,
+        cols,
+        srows,
+    )
+    if not parsed:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not produce an import column mapping. Try different column names or a smaller sample.",
+        )
+    return {"readOnly": True, "targetResourceType": t_rt, **parsed}
+
+
+@router.post("/copilot/assist/ticket-triage")
+def post_copilot_assist_ticket_triage(
+    body: Annotated[dict[str, Any], Body(...)],
+    db: Session = Depends(get_db),
+    auth: AuthContext | None = Depends(get_auth),
+) -> dict[str, Any]:
+    """
+    Pasted ticket/incident: extract hostnames/IPs, search inventory; optional LLM summary.
+    Body: ``text`` (string), ``summarize`` (optional bool, default true if LLM available).
+    """
+    ctx = require_auth_ctx(auth)
+    org = _org(db, ctx)
+    pasted = str(body.get("text", "") or "")
+    if not pasted.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="text is required")
+    do_summary = bool(body.get("summarize", True))
+    triage = build_triage_hits(db, ctx.organization.id, pasted)
+    bump("ticketTriageRequests", 1)
+    eff = get_effective_llm_for_runtime(org)
+    summary: str | None = None
+    if do_summary and eff.get("enabled") and eff.get("baseUrl") and eff.get("apiKey"):
+        summary = run_ticket_triage_summary(
+            str(eff["baseUrl"]),
+            str(eff["apiKey"]),
+            str(eff.get("defaultModel") or "gpt-4.1-mini"),
+            pasted,
+            triage,
+        )
+    return {"readOnly": True, **triage, "summary": summary}
 
 
 @router.post("/copilot/suggest_thread_title")

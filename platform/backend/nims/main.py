@@ -18,6 +18,7 @@ from nims.routers.v1.copilot import router as copilot_router
 from nims.routers.v1.core import router as core_router
 from nims.routers.v1.dcim import router as dcim_router
 from nims.routers.v1.extensions_admin import router as extensions_admin_router
+from nims.routers.v1.internal_llm import router as internal_llm_router
 from nims.routers.v1.identity_admin import router as identity_admin_router
 from nims.routers.v1.ipam import router as ipam_router
 from nims.routers.v1.reconciliation import router as reconciliation_router
@@ -79,6 +80,7 @@ app.include_router(bulk_router, prefix="/v1")
 app.include_router(catalog_router, prefix="/v1")
 app.include_router(connectors_router, prefix="/v1")
 app.include_router(copilot_router, prefix="/v1")
+app.include_router(internal_llm_router, prefix="/v1")
 app.include_router(extensions_admin_router, prefix="/v1")
 
 app.include_router(graphql_router, prefix="/graphql")
