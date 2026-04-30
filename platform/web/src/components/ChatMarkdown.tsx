@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef } from "react";
 import type { Components } from "react-markdown";
+import { Link } from "react-router-dom";
 import L from "leaflet";
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
 import ReactMarkdown from "react-markdown";
@@ -22,6 +23,7 @@ import {
   YAxis,
 } from "recharts";
 import remarkGfm from "remark-gfm";
+import { linkifyInventoryReferences } from "../lib/linkifyObjectRefs";
 
 export type ChatMarkdownVariant = "assistant" | "user";
 
@@ -426,13 +428,24 @@ function ProposalFromSpec({ spec }: { spec: ProposalSpec }) {
             const rtype = o.resource_type != null ? String(o.resource_type) : "";
             const rid = o.resource_id != null ? String(o.resource_id) : "";
             const why = o.rationale != null ? String(o.rationale) : "";
+            const linkTo =
+              rtype && rid && rid.length > 20 ? `/o/${encodeURIComponent(rtype)}/${encodeURIComponent(rid)}` : null;
             return (
               <li key={i}>
                 {action ? <span className="ai-assistant-proposal-action">{action}</span> : null}{" "}
                 {rtype || rid ? (
                   <span className="ai-assistant-proposal-target">
                     {rtype}
-                    {rid ? ` · ${rid.slice(0, 8)}…` : ""}
+                    {rid && linkTo ? (
+                      <>
+                        {" "}
+                        <Link to={linkTo} className="ai-md-link">
+                          {rid.slice(0, 8)}…
+                        </Link>
+                      </>
+                    ) : rid ? (
+                      ` · ${rid.slice(0, 8)}…`
+                    ) : null}
                   </span>
                 ) : null}
                 {why ? <div className="ai-assistant-proposal-rationale">{why}</div> : null}
@@ -448,6 +461,31 @@ function ProposalFromSpec({ spec }: { spec: ProposalSpec }) {
 
 function makeComponents(): Partial<Components> {
   return {
+    a: (props) => {
+      const { href, children, className, ...rest } = props;
+      if (typeof href === "string" && href.startsWith("/") && !href.startsWith("//")) {
+        return (
+          <Link
+            to={href}
+            className={className ? `ai-md-link ${className}` : "ai-md-link"}
+            {...(rest as Record<string, unknown>)}
+          >
+            {children}
+          </Link>
+        );
+      }
+      return (
+        <a
+          href={typeof href === "string" ? href : undefined}
+          className={className ? `ai-md-link ${className}` : "ai-md-link"}
+          target="_blank"
+          rel="noopener noreferrer"
+          {...(rest as Record<string, unknown>)}
+        >
+          {children}
+        </a>
+      );
+    },
     pre: ({ children }: { children?: ReactNode }) => (
       <div className="ai-assistant-fence-wrap">{children}</div>
     ),
@@ -498,10 +536,14 @@ function makeComponents(): Partial<Components> {
 const mdComponents = makeComponents();
 
 export function ChatMarkdown({ text, variant = "assistant" }: { text: string; variant?: ChatMarkdownVariant }) {
+  const forMd = useMemo(
+    () => (variant === "assistant" ? linkifyInventoryReferences(text) : text),
+    [text, variant],
+  );
   return (
     <div className={variant === "user" ? "ai-assistant-md ai-assistant-md--user" : "ai-assistant-md"}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-        {text}
+        {forMd}
       </ReactMarkdown>
     </div>
   );

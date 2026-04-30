@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve platform/.env when running from backend/ (e.g. `python -m nims` or `nims-api`).
@@ -25,6 +26,8 @@ class Settings(BaseSettings):
     node_env: str = "development"
     # Optional. When set, used to derive the Fernet key for DB-stored IdP secrets; otherwise `jwt_secret` is used.
     identity_encryption_key: str | None = None
+    # --- MCP: optional Streamable HTTP server for external LLM clients (same API tokens as REST). Off by default. ---
+    mcp_enabled: bool = Field(default=False, validation_alias="NIMS_MCP_ENABLED")
     # --- Job execution: inline (synchronous in API) or async (PENDING; process with nims-worker). ---
     job_execution_mode: str = "inline"  # inline | async
     job_worker_poll_interval_sec: float = 2.0

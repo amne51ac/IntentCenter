@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from nims.config import get_settings
 from nims.graphql_api import graphql_router
 from nims.routers.health import router as health_router
 from nims.routers.v1.auth import router as auth_router
@@ -18,8 +19,8 @@ from nims.routers.v1.copilot import router as copilot_router
 from nims.routers.v1.core import router as core_router
 from nims.routers.v1.dcim import router as dcim_router
 from nims.routers.v1.extensions_admin import router as extensions_admin_router
-from nims.routers.v1.internal_llm import router as internal_llm_router
 from nims.routers.v1.identity_admin import router as identity_admin_router
+from nims.routers.v1.internal_llm import router as internal_llm_router
 from nims.routers.v1.ipam import router as ipam_router
 from nims.routers.v1.reconciliation import router as reconciliation_router
 from nims.routers.v1.resource_graph import router as resource_graph_router
@@ -30,10 +31,16 @@ from nims.routers.v1.ui import router as ui_router
 from nims.routers.v1.users_admin import router as users_admin_router
 from nims.swagger_html import SWAGGER_DOCS_HTML
 
+MCP_SESSION_MANAGER = None
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    yield
+    if MCP_SESSION_MANAGER is not None:
+        async with MCP_SESSION_MANAGER.run():
+            yield
+    else:
+        yield
 
 
 app = FastAPI(
@@ -59,7 +66,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Mcp-Session-Id", "mcp-session-id", "MCP-Protocol-Version"],
 )
+
+if get_settings().mcp_enabled:
+    from nims.mcp.factory import build_mcp_stack
+
+    MCP_SESSION_MANAGER, _mcp_with_auth = build_mcp_stack()
+    app.mount("/mcp", _mcp_with_auth)
 
 app.include_router(health_router)
 app.include_router(auth_router, prefix="/v1")

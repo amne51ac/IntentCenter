@@ -178,8 +178,8 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
   messagesForSuggestRef.current = messages;
 
   const nextSteps = useQuery({
-    /* One cache entry per “turn”; epoch bumps in runAssistant’s finally so each reply triggers a new fetch. */
-    queryKey: ["copilot", "suggest_next_steps", store.activeId, nextStepsEpoch],
+    /* Refetch when route changes, thread changes, or a reply finishes (epoch). */
+    queryKey: ["copilot", "suggest_next_steps", loc.pathname, store.activeId, nextStepsEpoch],
     queryFn: () =>
       apiJson<{ suggestions: Suggestion[] }>("/v1/copilot/suggest_next_steps", {
         method: "POST",

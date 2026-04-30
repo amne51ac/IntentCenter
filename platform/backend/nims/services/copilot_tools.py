@@ -1,4 +1,7 @@
-"""Read-only tool execution for the in-app AI assistant (search, stats, resource view, resource graph)."""
+"""Read-only tool execution for the in-app AI assistant (search, stats, resource view, resource graph).
+
+External MCP clients (``/mcp``) call the same :func:`execute_copilot_tool` path via ``nims.mcp.adapters``.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +15,7 @@ from sqlalchemy.orm import Session
 from nims.auth_context import AuthContext
 from nims.models_generated import Circuit, Device, IpAddress, Location, Prefix, Provider, Rack, Vrf
 from nims.services.copilot_aggregates import device_breakdown_json, location_hierarchy_json
+from nims.services.copilot_catalog_list import CATALOG_LIST_QUERY_SPECS, catalog_list_json
 from nims.services.copilot_catalog_query import CATALOG_QUERY_SPECS, catalog_query_json
 from nims.services.device_hardware import build_device_hardware_tree
 from nims.services.global_search import global_search_items
@@ -202,11 +206,11 @@ OPENAI_TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "function": {
             "name": "catalog_breakdown",
             "description": (
-                "**Primary composable aggregate** (read-only): one tool for org-scoped **grouped counts** by a validated "
-                "`query` id (`BaseEntity/dimension`, e.g. `Device/location`, `Circuit/provider`). Use for tables, "
-                "`chart` blocks, and as a building block in **multi-step** analysis (call several times, then merge). "
-                "Add `search` / `get_resource_view` / `inventory_stats` as needed. Server runs SQL; you do not need a "
-                "separate one-off tool per chart type if the combination is in `allowedQueries` (errors list it)."
+                "**Composable aggregates (read-only):** org-scoped **grouped counts** by a validated `query` id "
+                "(`BaseEntity/dimension`, e.g. `Device/location`, `Circuit/provider`). For **row-level lists** of "
+                "entities matching a filter, use `catalog_list` (same id style, different tool). Use for tables, "
+                "`chart` blocks, and **multi-step** analysis. Server runs SQL. New patterns extend the enum; you do not "
+                "wait for a new top-level tool name for every report type that fits the same pattern."
             ),
             "parameters": {
                 "type": "object",
@@ -216,6 +220,33 @@ OPENAI_TOOL_DEFINITIONS: list[dict[str, Any]] = [
                         "enum": CATALOG_QUERY_SPECS,
                         "description": "Composite id: which objects to count and by which dimension (see enum).",
                     }
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "catalog_list",
+            "description": (
+                "**Composable row lists** (read-only): return up to `limit` **rows** for a validated `query` id, e.g. "
+                "`Device/without_interfaces` = devices with no non-deleted `Interface` records. Use for Markdown tables "
+                "and audits. Check `totalCount` and `truncated`. Pair with `catalog_breakdown` and `inventory_stats` in "
+                "multi-step answers. New list types are new **enum values**, not new tool names."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "enum": CATALOG_LIST_QUERY_SPECS,
+                        "description": "List id: which entities and which filter (see enum).",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max rows (1–200). Default 100.",
+                    },
                 },
                 "required": ["query"],
             },
@@ -400,6 +431,21 @@ def execute_copilot_tool(
                 }
             )
         return _clip(catalog_query_json(db, oid, q))
+
+    if name == "catalog_list":
+        q = str(arguments.get("query", "") or "").strip()
+        if not q:
+            return json.dumps(
+                {
+                    "error": "query is required",
+                    "allowedQueries": CATALOG_LIST_QUERY_SPECS,
+                }
+            )
+        try:
+            lim = int(arguments.get("limit", 100))
+        except (TypeError, ValueError):
+            lim = 100
+        return _clip(catalog_list_json(db, oid, q, lim))
 
     if name == "propose_change_preview":
         summary = str(arguments.get("summary", ""))[:4000]
