@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { apiJson, apiSsePost } from "../api/client";
@@ -163,6 +163,7 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
   const [panelWidthPx, setPanelWidthPx] = useState(() => readStoredWidth());
   /** Bumps when an assistant run finishes so next-step suggestions refetch with the full new transcript. */
   const [nextStepsEpoch, setNextStepsEpoch] = useState(0);
+  const queryClient = useQueryClient();
   const messagesForSuggestRef = useRef<AssistantMsg[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -178,14 +179,19 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
   messagesForSuggestRef.current = messages;
 
   const nextSteps = useQuery({
-    /* Refetch when route changes, thread changes, or a reply finishes (epoch). */
-    queryKey: ["copilot", "suggest_next_steps", loc.pathname, store.activeId, nextStepsEpoch],
+    /* Transcript for API must match the ref below; `nextStepsEpoch` is bumped after each completed turn. */
+    queryKey: [
+      "copilot",
+      "suggest_next_steps",
+      loc.pathname,
+      store.activeId,
+      nextStepsEpoch,
+    ] as const,
     queryFn: () =>
       apiJson<{ suggestions: Suggestion[] }>("/v1/copilot/suggest_next_steps", {
         method: "POST",
         body: JSON.stringify({
           context: ctx,
-          /* Ref avoids a stale `messages` closure if the request runs in a different microtask than the render. */
           messages: messagesForSuggestRef.current,
         }),
       }),
@@ -242,6 +248,8 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
       }));
 
       let acc = "";
+      /** Synchronous copy of the thread to POST to suggest_next_steps (React state can lag the last stream chunk). */
+      let nextStepsTranscript: AssistantMsg[] = withUser;
       const payload = {
         messages: withUser.map((m) => ({ role: m.role, content: m.content })),
         context: ctx,
@@ -340,19 +348,29 @@ export function AssistantPanel({ onMinimize }: { onMinimize: () => void }) {
             }
           })();
         }
+        nextStepsTranscript =
+          finalText.trim().length > 0
+            ? [...withUser, { role: "assistant" as const, content: finalText }]
+            : withUser;
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Request failed");
         setStore((s) => ({
           ...s,
           threads: s.threads.map((t) => (t.id === tid ? { ...t, messages: withUser, updatedAt: Date.now() } : t)),
         }));
+        nextStepsTranscript = withUser;
       } finally {
+        messagesForSuggestRef.current = nextStepsTranscript;
         setPending(false);
         setStreamStatus(null);
         setNextStepsEpoch((e) => e + 1);
+        // Ref is correct immediately; state may not have committed yet. Force refetch so POST uses the snapshot above.
+        queueMicrotask(() => {
+          void queryClient.invalidateQueries({ queryKey: ["copilot", "suggest_next_steps"] });
+        });
       }
     },
-    [ctx],
+    [ctx, queryClient],
   );
 
   const onNewChat = useCallback(() => {

@@ -12,6 +12,11 @@ import httpx
 from sqlalchemy.orm import Session
 
 from nims.auth_context import AuthContext
+from nims.services.copilot_next_steps import (
+    build_next_steps_user_content,
+    extract_last_assistant_text,
+    extract_last_user_text,
+)
 from nims.services.copilot_tools import OPENAI_TOOL_DEFINITIONS, execute_copilot_tool
 from nims.services.llm_metrics import error_bump
 from nims.services.llm_url import (
@@ -66,7 +71,9 @@ def _build_copilot_system_text(page_context: dict[str, Any] | None) -> str:
         "lists instead of aggregates. Do not claim you cannot build such a table without calling `catalog_list` first.\n"
         "- **Proposed changes (read-only):** to describe planned writes for human review, use the `propose_change_preview` "
         "tool. It never mutates data; it returns a preview with current snapshots. Do not claim a change was applied.\n"
-        "When you reference results, give object type, id, and a path like /o/Type/<uuid>. Be concise. English only. "
+        "When you reference a catalog object, include a Markdown link so the UI can navigate: "
+        "`[short label](/o/ResourceType/<uuid>)` (ResourceType must match the API, e.g. Device, Location, ServiceInstance). "
+        "Bare `/o/Type/<uuid>` paths in prose are also linkified client-side. Be concise. English only. "
         "The only write proposal path is the preview tool; you cannot call mutating APIs.\n"
         "- **Formatting:** Reply in **Markdown** (headings, lists, tables, bold). For a **chart**, use a fenced block "
         "with language `chart` and a single JSON object. Schemas: (1) bar/line/area: v=1, kind, title, xKey, yKey, data. "
@@ -744,20 +751,40 @@ def run_suggest_next_steps(
     """
     if not (page_situation or "").strip() and not (chat_transcript or "").strip():
         return []
+    has_chat = bool((chat_transcript or "").strip())
     system = (
         "You are helping users navigate the IntentCenter DCIM/inventory web app. "
         "The in-app assistant can use tools: search, inventory_stats, get_resource_view, get_resource_graph, "
         "list_location_hierarchy, catalog_breakdown (composable counts by Entity/dimension), device_count_breakdown, "
         "catalog_list (composable row lists by query id), propose_change_preview. "
-        "Propose exactly 3 different, concrete next questions or actions the user could take, "
-        "informed by the app page/screen and the recent chat. "
-        "Vary the intent (e.g. counts vs search vs relationships vs next object). "
-        "Each option must be useful if pasted as a user message to the assistant. "
+        "Propose exactly 3 *different* next questions the user could send, each with a *specific* user prompt that "
+        "the assistant can run with the right tool(s).\n"
+        "Rules (strict):\n"
+        "- The user message you write must stay on the *same thread* as the last user/assistant turns when those "
+        "turns are non-trivial. Reference what they just asked, what the assistant just answered, and/or the object in "
+        "the URL, by name in the label or first sentence of the prompt when applicable.\n"
+    )
+    if has_chat:
+        system += (
+            "- The recent chat is non-empty. Do **not** suggest default org-wide overviews: avoid chips whose main "
+            "thrust is 'inventory totals for the org', 'map of all locations in the catalog', or generic 'Racks and "
+            "circuits by site' unless the user *explicitly* asked for a broad org snapshot, counts, or a map. Prefer "
+            "a measurable next step (e.g. catalog_list with a specific query, get_resource_view/graph for the open "
+            "object, a tighter search) tied to the last user ask.\n"
+        )
+    system += (
+        "- If the last assistant said it could not do something, the next step should be the *closest* achievable "
+        "read-only alternative, not a generic org tour.\n"
+        "Each option must be useful if pasted as a user message. "
         "Output a **single JSON object** only, no markdown fences, in this form:\n"
         '{"suggestions":[{"id":"1","label":"4-8 word chip text","prompt":"Full user message to send to the assistant."},...]}'  # noqa: E501
-        "\nExactly 3 objects in the suggestions array. English. Short labels; prompts may be 1-3 sentences."
+        "\nExactly 3 objects in the suggestions array. English. Short labels; prompts 1-3 sentences."
     )
-    user_c = f"## Page and screen\n{page_situation[:6000]}\n\n## Recent chat\n{chat_transcript[:8000] or '(no messages yet)'}\n"
+    last_user = extract_last_user_text(chat_transcript or "")
+    last_asst = extract_last_assistant_text(chat_transcript or "")
+    user_c = build_next_steps_user_content(
+        page_situation, chat_transcript, last_user, last_asst, 8000
+    )
     url = chat_completions_url(base_url, deployment=model)
     if not url:
         return []
@@ -767,7 +794,7 @@ def run_suggest_next_steps(
             {"role": "user", "content": user_c},
         ],
         "max_tokens": 450,
-        "temperature": 0.5,
+        "temperature": 0.35,
     }
     if use_model_in_request_body(base_url):
         jbody["model"] = model

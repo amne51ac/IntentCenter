@@ -2359,6 +2359,11 @@ tr.data-row-clickable:hover td {
   text-decoration: underline;
   text-underline-offset: 0.1em;
 }
+.ai-assistant-proposal-wrap a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.1em;
+}
 .ai-assistant-md--user p {
   margin: 0;
 }

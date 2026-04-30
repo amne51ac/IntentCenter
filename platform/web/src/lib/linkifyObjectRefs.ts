@@ -24,10 +24,7 @@ const TYPE_SLASH_UUID = new RegExp(`(?<![/])\\b([A-Z][A-Za-z0-9_]*)/(${UUID})\\b
 
 function linkifySegment(s: string): string {
   let t = s.replace(BARE_INVENTORY_PATH, (_m, p: string) => `[${p}](${p})`);
-  t = t.replace(TYPE_SLASH_UUID, (full, resType: string, id: string) => {
-    if (id.length < 10) {
-      return full;
-    }
+  t = t.replace(TYPE_SLASH_UUID, (_full, resType: string, id: string) => {
     const path = `/o/${encodeURIComponent(resType)}/${id}`;
     return `[${resType}](${path})`;
   });

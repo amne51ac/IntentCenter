@@ -12,6 +12,7 @@ Key entry points:
 |------|------|
 | `index.html` | Product landing (**About** — what / why / how), **in-app screenshots**; **live demo** at [https://demo.intentcenter.io](https://demo.intentcenter.io) |
 | `documentation.html` | Doc hub and links to repo sources |
+| `demo-database.md` | **AWS demo:** deploy / `deploy.sh` / ECS (entrypoint runs migrations); console & emergency Prisma notes |
 | `platform.html` | Web console + REST summary (inventory, extensibility, auth touchpoints) |
 | `getting-started.html` | Local runbook (Postgres, API, optional **job worker**, env) |
 | `api.html` | REST/OpenAPI, authentication surfaces, v1 touchpoints |

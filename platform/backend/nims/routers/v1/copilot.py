@@ -33,6 +33,10 @@ from nims.services.llm_openai import (
     run_suggest_thread_title,
     run_ticket_triage_summary,
 )
+from nims.services.copilot_next_steps import (
+    build_heuristic_suggestion_chips,
+    pad_suggestions_to_three,
+)
 from nims.services.resource_item import load_resource_item
 from nims.services.ticket_triage import build_triage_hits
 from nims.services.llm_test import test_openai_chat_minimal
@@ -399,10 +403,16 @@ def _format_messages_for_next_steps(raw: list[Any]) -> str:
 def _fallback_suggest_next_steps(page_s: str, chat_t: str) -> list[dict[str, Any]]:
     """Deterministic 3 options when the LLM is off or returns empty/unparseable JSON.
     Varies with `chat_t` + `page_s` so repeated calls are not byte-identical as the chat grows.
+    When the transcript has enough signal, prefer *topic-specific* chips (interfaces, list queries, last question)
+    before the generic org-snapshot set.
     """
     raw = f"{page_s or ''}\n{chat_t or ''}".encode("utf-8", errors="replace")
     h = int(hashlib.sha256(raw).hexdigest()[:12], 16)
     has_object = "Object shown in the UI" in (page_s or "")
+
+    heu = build_heuristic_suggestion_chips(page_s, chat_t)
+    if heu:
+        return pad_suggestions_to_three(heu, h, has_object)
 
     stat_variants: list[tuple[str, str, str]] = [
         (

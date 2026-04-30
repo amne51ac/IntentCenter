@@ -58,3 +58,5 @@ Reserved / not yet implemented: `POST /v1/plugins/install` (**501**), remote mod
 | Graph only | `GET /v1/resource-graph/{resourceType}/{id}` — relationship graph JSON |
 
 For full run instructions, database setup, and CI, see the repository root [`README.md`](../README.md).
+
+**Hosted demo (AWS):** schema updates usually come from **deploying a new image** that includes the latest `prisma/migrations/`; `docker-entrypoint.sh` runs `prisma migrate deploy` on container start. Use your normal **`./deploy.sh` / AWS** flow, or the console to force a new ECS deployment—see [`docs/demo-database.md`](../docs/demo-database.md). For emergencies, `npm run db:migrate:deploy` from `platform/` with the demo `DATABASE_URL` is a fallback.

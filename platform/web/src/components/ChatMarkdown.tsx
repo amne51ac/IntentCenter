@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { useEffect, useMemo, useRef } from "react";
 import type { Components } from "react-markdown";
 import { Link } from "react-router-dom";
@@ -462,14 +462,15 @@ function ProposalFromSpec({ spec }: { spec: ProposalSpec }) {
 function makeComponents(): Partial<Components> {
   return {
     a: (props) => {
-      const { href, children, className, ...rest } = props;
+      const { href, children, className, node: _n, ...rest } = props as {
+        href?: string;
+        children?: ReactNode;
+        className?: string;
+        node?: unknown;
+      };
       if (typeof href === "string" && href.startsWith("/") && !href.startsWith("//")) {
         return (
-          <Link
-            to={href}
-            className={className ? `ai-md-link ${className}` : "ai-md-link"}
-            {...(rest as Record<string, unknown>)}
-          >
+          <Link to={href} className={className ? `ai-md-link ${className}` : "ai-md-link"}>
             {children}
           </Link>
         );
@@ -480,7 +481,7 @@ function makeComponents(): Partial<Components> {
           className={className ? `ai-md-link ${className}` : "ai-md-link"}
           target="_blank"
           rel="noopener noreferrer"
-          {...(rest as Record<string, unknown>)}
+          {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)}
         >
           {children}
         </a>
