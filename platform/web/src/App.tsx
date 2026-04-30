@@ -134,6 +134,7 @@ export default function App() {
             <Route path="docs" element={<P.AdminDocsPage />} />
             <Route path="health" element={<P.AdminHealthPage />} />
             <Route path="identity" element={<P.IdentityPage />} />
+            <Route path="extensions" element={<P.PluginExtensionsPage />} />
           </Route>
           <Route path="account" element={<P.AccountPage />} />
           <Route

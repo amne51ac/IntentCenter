@@ -13,15 +13,18 @@ from nims.routers.v1.automation import router as automation_router
 from nims.routers.v1.bulk import router as bulk_router
 from nims.routers.v1.catalog import router as catalog_router
 from nims.routers.v1.circuits import router as circuits_router
+from nims.routers.v1.connectors import router as connectors_router
 from nims.routers.v1.core import router as core_router
 from nims.routers.v1.dcim import router as dcim_router
+from nims.routers.v1.extensions_admin import router as extensions_admin_router
+from nims.routers.v1.identity_admin import router as identity_admin_router
 from nims.routers.v1.ipam import router as ipam_router
 from nims.routers.v1.reconciliation import router as reconciliation_router
 from nims.routers.v1.resource_graph import router as resource_graph_router
 from nims.routers.v1.resource_view import router as resource_view_router
 from nims.routers.v1.search import router as search_router
 from nims.routers.v1.templates import router as templates_router
-from nims.routers.v1.identity_admin import router as identity_admin_router
+from nims.routers.v1.ui import router as ui_router
 from nims.routers.v1.users_admin import router as users_admin_router
 from nims.swagger_html import SWAGGER_DOCS_HTML
 
@@ -59,6 +62,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router, prefix="/v1")
 app.include_router(core_router, prefix="/v1")
+app.include_router(ui_router, prefix="/v1")
 app.include_router(users_admin_router, prefix="/v1")
 app.include_router(identity_admin_router, prefix="/v1")
 app.include_router(dcim_router, prefix="/v1")
@@ -72,6 +76,8 @@ app.include_router(resource_graph_router, prefix="/v1")
 app.include_router(resource_view_router, prefix="/v1")
 app.include_router(bulk_router, prefix="/v1")
 app.include_router(catalog_router, prefix="/v1")
+app.include_router(connectors_router, prefix="/v1")
+app.include_router(extensions_admin_router, prefix="/v1")
 
 app.include_router(graphql_router, prefix="/graphql")
 

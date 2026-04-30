@@ -63,12 +63,15 @@ model Organization {
   rackGroups                 RackGroup[]
   circuitDiversityGroups     CircuitDiversityGroup[]
   rackReservations           RackReservation[]
+  pluginPlacements           PluginPlacement[]
   tenantGroups               TenantGroup[]
   contacts                   Contact[]
   teams                      Team[]
   ipamNamespaces             IpamNamespace[]
   virtualDeviceContexts      VirtualDeviceContext[]
   deviceGroups               DeviceGroup[]
+  pluginRegistrations         PluginRegistration[]
+  connectorRegistrations     ConnectorRegistration[]
   modules                    Module[]
   inventoryItems             InventoryItem[]
   softwareImageFiles         SoftwareImageFile[]
@@ -1502,13 +1505,68 @@ model StatusDefinition {
   @@index([organizationId])
 }
 
-// --- Plugin registry (metadata only in Phase 1) ---
+// --- Plugin registry: one row per organization per package ---
 
 model PluginRegistration {
-  id          String   @id @default(uuid()) @db.Uuid
-  packageName String   @unique
-  version     String
-  enabled     Boolean  @default(true)
-  manifest    Json?
-  registeredAt DateTime @default(now())
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  packageName     String
+  version         String
+  enabled         Boolean  @default(true)
+  manifest        Json?
+  registeredAt    DateTime @default(now())
+  placements      PluginPlacement[]
+  connectors      ConnectorRegistration[]
+
+  @@unique([organizationId, packageName])
+  @@index([organizationId])
+}
+
+/// Outbound / integration connector (credentials stay server-side; not returned in public list).
+model ConnectorRegistration {
+  id                   String   @id @default(uuid()) @db.Uuid
+  organizationId       String   @db.Uuid
+  organization         Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pluginRegistrationId String?  @db.Uuid
+  pluginRegistration     PluginRegistration? @relation(fields: [pluginRegistrationId], references: [id], onDelete: SetNull)
+  type                 String
+  name                 String
+  enabled              Boolean  @default(true)
+  settings             Json     @default("{}")
+  /// Opaque server-side store (e.g. JSON). Never exposed in list API; use admin detail with care.
+  credentialsEnc       String?  @db.Text
+  healthStatus         String?
+  lastSyncAt           DateTime?
+  lastError            String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([pluginRegistrationId])
+}
+
+/// Per-organization UI slot placement (widgets on pages); macro bindings are evaluated in the web shell.
+model PluginPlacement {
+  id                   String   @id @default(uuid()) @db.Uuid
+  organizationId       String   @db.Uuid
+  organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pluginRegistrationId String   @db.Uuid
+  pluginRegistration     PluginRegistration @relation(fields: [pluginRegistrationId], references: [id], onDelete: Cascade)
+  pageId               String
+  slot                 String
+  widgetKey            String
+  priority             Int      @default(0)
+  enabled              Boolean  @default(true)
+  filters              Json?
+  /// Maps widget prop names to macro strings, e.g. { "title": "{{ resource.name }}" }
+  macroBindings        Json?
+  /// e.g. ["READ"] or ["ADMIN"] — shell may hide widget if the user does not meet requirements
+  requiredPermissions  Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([organizationId, pageId])
+  @@index([pluginRegistrationId])
 }

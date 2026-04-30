@@ -1,11 +1,26 @@
-from typing import Optional
 import datetime
 import enum
 import uuid
+from typing import Any, Optional
 
-from sqlalchemy import ARRAY, Boolean, DateTime, Enum, Float, ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, Text, Uuid, text
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKeyConstraint,
+    Integer,
+    PrimaryKeyConstraint,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
 
 class Base(DeclarativeBase):
     pass
@@ -76,7 +91,7 @@ class CircuitType(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     Circuit: Mapped[list['Circuit']] = relationship('Circuit', back_populates='CircuitType_')
 
@@ -101,7 +116,7 @@ class LocationType(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     Location: Mapped[list['Location']] = relationship('Location', back_populates='LocationType_')
 
@@ -131,7 +146,7 @@ class Organization(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
     identityConfig: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
 
     ApiToken: Mapped[list['ApiToken']] = relationship('ApiToken', back_populates='Organization_')
@@ -189,20 +204,127 @@ class Organization(Base):
     ConsoleConnection: Mapped[list['ConsoleConnection']] = relationship('ConsoleConnection', back_populates='Organization_')
     IpAddress: Mapped[list['IpAddress']] = relationship('IpAddress', back_populates='Organization_')
     PowerConnection: Mapped[list['PowerConnection']] = relationship('PowerConnection', back_populates='Organization_')
+    PluginPlacement: Mapped[list['PluginPlacement']] = relationship('PluginPlacement', back_populates='Organization_')
+    PluginRegistration: Mapped[list['PluginRegistration']] = relationship('PluginRegistration', back_populates='Organization_')
+    ConnectorRegistration: Mapped[list['ConnectorRegistration']] = relationship(
+        'ConnectorRegistration', back_populates='Organization_'
+    )
 
 
 class PluginRegistration(Base):
     __tablename__ = 'PluginRegistration'
     __table_args__ = (
+        ForeignKeyConstraint(
+            ['organizationId'],
+            ['Organization.id'],
+            ondelete='CASCADE',
+            onupdate='CASCADE',
+            name='PluginRegistration_organizationId_fkey',
+        ),
         PrimaryKeyConstraint('id', name='PluginRegistration_pkey'),
+        UniqueConstraint('organizationId', 'packageName', name='PluginRegistration_organizationId_packageName_key'),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organizationId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     packageName: Mapped[str] = mapped_column(Text, nullable=False)
     version: Mapped[str] = mapped_column(Text, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
     registeredAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
-    manifest: Mapped[Optional[dict]] = mapped_column(JSONB)
+    manifest: Mapped[dict | None] = mapped_column(JSONB)
+
+    Organization_: Mapped['Organization'] = relationship('Organization', back_populates='PluginRegistration')
+    PluginPlacement: Mapped[list['PluginPlacement']] = relationship('PluginPlacement', back_populates='PluginRegistration_')
+    ConnectorRegistration: Mapped[list['ConnectorRegistration']] = relationship(
+        'ConnectorRegistration', back_populates='PluginRegistration_'
+    )
+
+
+class ConnectorRegistration(Base):
+    __tablename__ = 'ConnectorRegistration'
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['organizationId'],
+            ['Organization.id'],
+            ondelete='CASCADE',
+            onupdate='CASCADE',
+            name='ConnectorRegistration_organizationId_fkey',
+        ),
+        ForeignKeyConstraint(
+            ['pluginRegistrationId'],
+            ['PluginRegistration.id'],
+            ondelete='SET NULL',
+            onupdate='CASCADE',
+            name='ConnectorRegistration_pluginRegistrationId_fkey',
+        ),
+        PrimaryKeyConstraint('id', name='ConnectorRegistration_pkey'),
+        UniqueConstraint('organizationId', 'name', name='ConnectorRegistration_organizationId_name_key'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organizationId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    pluginRegistrationId: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
+    settings: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    credentialsEnc: Mapped[str | None] = mapped_column(Text)
+    healthStatus: Mapped[str | None] = mapped_column(Text)
+    lastSyncAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    lastError: Mapped[str | None] = mapped_column(Text)
+    createdAt: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP')
+    )
+    updatedAt: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP')
+    )
+
+    Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ConnectorRegistration')
+    PluginRegistration_: Mapped[Optional['PluginRegistration']] = relationship(
+        'PluginRegistration', back_populates='ConnectorRegistration'
+    )
+
+
+class PluginPlacement(Base):
+    __tablename__ = 'PluginPlacement'
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['organizationId'],
+            ['Organization.id'],
+            ondelete='CASCADE',
+            onupdate='CASCADE',
+            name='PluginPlacement_organizationId_fkey',
+        ),
+        ForeignKeyConstraint(
+            ['pluginRegistrationId'],
+            ['PluginRegistration.id'],
+            ondelete='CASCADE',
+            onupdate='CASCADE',
+            name='PluginPlacement_pluginRegistrationId_fkey',
+        ),
+        PrimaryKeyConstraint('id', name='PluginPlacement_pkey'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    organizationId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    pluginRegistrationId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    pageId: Mapped[str] = mapped_column(Text, nullable=False)
+    slot: Mapped[str] = mapped_column(Text, nullable=False)
+    widgetKey: Mapped[str] = mapped_column(Text, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text('0'))
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
+    filters: Mapped[dict | None] = mapped_column(JSONB)
+    macroBindings: Mapped[dict | None] = mapped_column(JSONB)
+    requiredPermissions: Mapped[Any | None] = mapped_column(JSONB)
+    createdAt: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP')
+    )
+    updatedAt: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP')
+    )
+
+    Organization_: Mapped['Organization'] = relationship('Organization', back_populates='PluginPlacement')
+    PluginRegistration_: Mapped['PluginRegistration'] = relationship('PluginRegistration', back_populates='PluginPlacement')
 
 
 class Rir(Base):
@@ -214,7 +336,7 @@ class Rir(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     Prefix: Mapped[list['Prefix']] = relationship('Prefix', back_populates='Rir_')
 
@@ -228,7 +350,7 @@ class SoftwarePlatform(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     SoftwareImageFile: Mapped[list['SoftwareImageFile']] = relationship('SoftwareImageFile', back_populates='SoftwarePlatform_')
     SoftwareVersion: Mapped[list['SoftwareVersion']] = relationship('SoftwareVersion', back_populates='SoftwarePlatform_')
@@ -257,9 +379,9 @@ class PrismaMigrations(Base):
     migration_name: Mapped[str] = mapped_column(String(255), nullable=False)
     started_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     applied_steps_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text('0'))
-    finished_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
-    logs: Mapped[Optional[str]] = mapped_column(Text)
-    rolled_back_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    finished_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(True))
+    logs: Mapped[str | None] = mapped_column(Text)
+    rolled_back_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(True))
 
 
 class ApiToken(Base):
@@ -275,8 +397,8 @@ class ApiToken(Base):
     tokenHash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[Apitokenrole] = mapped_column(Enum(Apitokenrole, values_callable=lambda cls: [member.value for member in cls], name='ApiTokenRole'), nullable=False, server_default=text('\'WRITE\'::"ApiTokenRole"'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
-    expiresAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
-    lastUsedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    expiresAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    lastUsedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ApiToken')
 
@@ -295,9 +417,9 @@ class AuditEvent(Base):
     resourceType: Mapped[str] = mapped_column(Text, nullable=False)
     resourceId: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
-    correlationId: Mapped[Optional[str]] = mapped_column(Text)
-    before: Mapped[Optional[dict]] = mapped_column(JSONB)
-    after: Mapped[Optional[dict]] = mapped_column(JSONB)
+    correlationId: Mapped[str | None] = mapped_column(Text)
+    before: Mapped[dict | None] = mapped_column(JSONB)
+    after: Mapped[dict | None] = mapped_column(JSONB)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='AuditEvent')
 
@@ -316,8 +438,8 @@ class ChangeRequest(Base):
     status: Mapped[Changerequeststatus] = mapped_column(Enum(Changerequeststatus, values_callable=lambda cls: [member.value for member in cls], name='ChangeRequestStatus'), nullable=False, server_default=text('\'DRAFT\'::"ChangeRequestStatus"'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    correlationId: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    correlationId: Mapped[str | None] = mapped_column(Text)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ChangeRequest')
 
@@ -334,10 +456,10 @@ class CloudNetwork(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    cloudProvider: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    cloudProvider: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='CloudNetwork')
     CloudService: Mapped[list['CloudService']] = relationship('CloudService', back_populates='CloudNetwork_')
@@ -355,10 +477,10 @@ class Cluster(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    clusterType: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    clusterType: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Cluster')
     VirtualMachine: Mapped[list['VirtualMachine']] = relationship('VirtualMachine', back_populates='Cluster_')
@@ -376,11 +498,11 @@ class Contact(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(Text)
-    phone: Mapped[Optional[str]] = mapped_column(Text)
-    title: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    email: Mapped[str | None] = mapped_column(Text)
+    phone: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Contact')
 
@@ -395,8 +517,8 @@ class DeviceFamily(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False)
-    manufacturerId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    manufacturerId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    description: Mapped[str | None] = mapped_column(Text)
 
     Manufacturer_: Mapped[Optional['Manufacturer']] = relationship('Manufacturer', back_populates='DeviceFamily')
 
@@ -414,8 +536,8 @@ class DeviceGroup(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='DeviceGroup')
     DeviceGroupMember: Mapped[list['DeviceGroupMember']] = relationship('DeviceGroupMember', back_populates='DeviceGroup_')
@@ -433,9 +555,9 @@ class DeviceRedundancyGroup(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    protocol: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    protocol: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='DeviceRedundancyGroup')
     DeviceRedundancyGroupMember: Mapped[list['DeviceRedundancyGroupMember']] = relationship('DeviceRedundancyGroupMember', back_populates='DeviceRedundancyGroup_')
@@ -471,8 +593,8 @@ class DynamicGroup(Base):
     definition: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='DynamicGroup')
 
@@ -489,9 +611,9 @@ class InterfaceRedundancyGroup(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    protocol: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    protocol: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='InterfaceRedundancyGroup')
     InterfaceRedundancyGroupMember: Mapped[list['InterfaceRedundancyGroupMember']] = relationship('InterfaceRedundancyGroupMember', back_populates='InterfaceRedundancyGroup_')
@@ -510,8 +632,8 @@ class IpamNamespace(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='IpamNamespace')
 
@@ -531,7 +653,7 @@ class JobDefinition(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='JobDefinition')
     JobRun: Mapped[list['JobRun']] = relationship('JobRun', back_populates='JobDefinition_')
@@ -553,11 +675,11 @@ class Location(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    parentId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    latitude: Mapped[Optional[float]] = mapped_column(Float)
-    longitude: Mapped[Optional[float]] = mapped_column(Float)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    parentId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    description: Mapped[str | None] = mapped_column(Text)
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     LocationType_: Mapped['LocationType'] = relationship('LocationType', back_populates='Location')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Location')
@@ -577,8 +699,8 @@ class ModuleType(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     model: Mapped[str] = mapped_column(Text, nullable=False)
-    manufacturerId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    partNumber: Mapped[Optional[str]] = mapped_column(Text)
+    manufacturerId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    partNumber: Mapped[str | None] = mapped_column(Text)
 
     Manufacturer_: Mapped[Optional['Manufacturer']] = relationship('Manufacturer', back_populates='ModuleType')
     Module: Mapped[list['Module']] = relationship('Module', back_populates='ModuleType_')
@@ -596,10 +718,10 @@ class MplsDomain(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    rd: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    rd: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='MplsDomain')
 
@@ -621,7 +743,7 @@ class ObjectTemplate(Base):
     definition: Mapped[dict] = mapped_column(JSONB, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ObjectTemplate')
     ResourceExtension: Mapped[list['ResourceExtension']] = relationship('ResourceExtension', back_populates='ObjectTemplate_')
@@ -640,7 +762,7 @@ class Project(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Project')
 
@@ -657,8 +779,8 @@ class Provider(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    asn: Mapped[Optional[int]] = mapped_column(Integer)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    asn: Mapped[int | None] = mapped_column(Integer)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Provider')
     Circuit: Mapped[list['Circuit']] = relationship('Circuit', back_populates='Provider_')
@@ -679,8 +801,8 @@ class RackGroup(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='RackGroup')
     Rack: Mapped[list['Rack']] = relationship('Rack', back_populates='RackGroup_')
@@ -699,8 +821,8 @@ class CircuitDiversityGroup(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='CircuitDiversityGroup')
     Circuit: Mapped[list['Circuit']] = relationship('Circuit', back_populates='CircuitDiversityGroup_')
@@ -720,9 +842,9 @@ class ServiceInstance(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'::text"))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    customerRef: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    customerRef: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ServiceInstance')
 
@@ -740,10 +862,10 @@ class SoftwareImageFile(Base):
     filename: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    platformId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    sha256: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    platformId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    sha256: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='SoftwareImageFile')
     SoftwarePlatform_: Mapped[Optional['SoftwarePlatform']] = relationship('SoftwarePlatform', back_populates='SoftwareImageFile')
@@ -761,7 +883,7 @@ class SoftwareVersion(Base):
     version: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    releaseNotes: Mapped[Optional[str]] = mapped_column(Text)
+    releaseNotes: Mapped[str | None] = mapped_column(Text)
 
     SoftwarePlatform_: Mapped['SoftwarePlatform'] = relationship('SoftwarePlatform', back_populates='SoftwareVersion')
 
@@ -780,8 +902,8 @@ class StatusDefinition(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    color: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    color: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='StatusDefinition')
 
@@ -799,9 +921,9 @@ class Tag(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    color: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    color: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Tag')
     TagAssignment: Mapped[list['TagAssignment']] = relationship('TagAssignment', back_populates='Tag_')
@@ -820,8 +942,8 @@ class Team(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Team')
 
@@ -839,8 +961,8 @@ class TenantGroup(Base):
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='TenantGroup')
 
@@ -861,9 +983,9 @@ class User(Base):
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
     preferences: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     isActive: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
-    displayName: Mapped[Optional[str]] = mapped_column(Text)
-    passwordHash: Mapped[Optional[str]] = mapped_column(Text)
-    externalSubject: Mapped[Optional[str]] = mapped_column(Text)
+    displayName: Mapped[str | None] = mapped_column(Text)
+    passwordHash: Mapped[str | None] = mapped_column(Text)
+    externalSubject: Mapped[str | None] = mapped_column(Text)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='User')
 
@@ -880,9 +1002,9 @@ class VirtualChassis(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    domainId: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    domainId: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='VirtualChassis')
     VirtualChassisMember: Mapped[list['VirtualChassisMember']] = relationship('VirtualChassisMember', back_populates='VirtualChassis_')
@@ -902,8 +1024,8 @@ class Vlan(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    vlanGroupId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    vlanGroupId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Vlan')
     VlanGroup_: Mapped[Optional['VlanGroup']] = relationship('VlanGroup', back_populates='Vlan')
@@ -922,9 +1044,9 @@ class Vpn(Base):
     vpnType: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Vpn')
 
@@ -941,8 +1063,8 @@ class Vrf(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    rd: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    rd: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Vrf')
     Prefix: Mapped[list['Prefix']] = relationship('Prefix', back_populates='Vrf_')
@@ -963,9 +1085,9 @@ class WebhookSubscription(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    secret: Mapped[Optional[str]] = mapped_column(Text)
-    resourceTypes: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text()))
-    events: Mapped[Optional[list[Webhookevent]]] = mapped_column(ARRAY(Enum(Webhookevent, values_callable=lambda cls: [member.value for member in cls], name='WebhookEvent')))
+    secret: Mapped[str | None] = mapped_column(Text)
+    resourceTypes: Mapped[list[str] | None] = mapped_column(ARRAY(Text()))
+    events: Mapped[list[Webhookevent] | None] = mapped_column(ARRAY(Enum(Webhookevent, values_callable=lambda cls: [member.value for member in cls], name='WebhookEvent')))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='WebhookSubscription')
 
@@ -982,10 +1104,10 @@ class WirelessNetwork(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    ssid: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    ssid: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='WirelessNetwork')
 
@@ -1007,12 +1129,12 @@ class Circuit(Base):
     status: Mapped[Circuitstatus] = mapped_column(Enum(Circuitstatus, values_callable=lambda cls: [member.value for member in cls], name='CircuitStatus'), nullable=False, server_default=text('\'PLANNED\'::"CircuitStatus"'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    bandwidthMbps: Mapped[Optional[int]] = mapped_column(Integer)
-    aSideNotes: Mapped[Optional[str]] = mapped_column(Text)
-    zSideNotes: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
-    circuitTypeId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    circuitDiversityGroupId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    bandwidthMbps: Mapped[int | None] = mapped_column(Integer)
+    aSideNotes: Mapped[str | None] = mapped_column(Text)
+    zSideNotes: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    circuitTypeId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    circuitDiversityGroupId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     CircuitDiversityGroup_: Mapped[Optional['CircuitDiversityGroup']] = relationship('CircuitDiversityGroup', back_populates='Circuit')
     CircuitType_: Mapped[Optional['CircuitType']] = relationship('CircuitType', back_populates='Circuit')
@@ -1035,11 +1157,11 @@ class CloudService(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    cloudNetworkId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    serviceType: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    cloudNetworkId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    serviceType: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     CloudNetwork_: Mapped[Optional['CloudNetwork']] = relationship('CloudNetwork', back_populates='CloudService')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='CloudService')
@@ -1059,11 +1181,11 @@ class JobRun(Base):
     status: Mapped[Jobrunstatus] = mapped_column(Enum(Jobrunstatus, values_callable=lambda cls: [member.value for member in cls], name='JobRunStatus'), nullable=False, server_default=text('\'PENDING\'::"JobRunStatus"'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    idempotencyKey: Mapped[Optional[str]] = mapped_column(Text)
-    input: Mapped[Optional[dict]] = mapped_column(JSONB)
-    output: Mapped[Optional[dict]] = mapped_column(JSONB)
-    logs: Mapped[Optional[str]] = mapped_column(Text)
-    correlationId: Mapped[Optional[str]] = mapped_column(Text)
+    idempotencyKey: Mapped[str | None] = mapped_column(Text)
+    input: Mapped[dict | None] = mapped_column(JSONB)
+    output: Mapped[dict | None] = mapped_column(JSONB)
+    logs: Mapped[str | None] = mapped_column(Text)
+    correlationId: Mapped[str | None] = mapped_column(Text)
 
     JobDefinition_: Mapped['JobDefinition'] = relationship('JobDefinition', back_populates='JobRun')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='JobRun')
@@ -1083,8 +1205,8 @@ class PowerPanel(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Location_: Mapped['Location'] = relationship('Location', back_populates='PowerPanel')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='PowerPanel')
@@ -1107,10 +1229,10 @@ class Prefix(Base):
     cidr: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    parentId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
-    rirId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    description: Mapped[str | None] = mapped_column(Text)
+    parentId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    rirId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Prefix')
     Prefix: Mapped[Optional['Prefix']] = relationship('Prefix', remote_side=[id], back_populates='Prefix_reverse')
@@ -1134,8 +1256,8 @@ class ProviderNetwork(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ProviderNetwork')
     Provider_: Mapped['Provider'] = relationship('Provider', back_populates='ProviderNetwork')
@@ -1157,8 +1279,8 @@ class Rack(Base):
     uHeight: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text('42'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
-    rackGroupId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    rackGroupId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     Location_: Mapped['Location'] = relationship('Location', back_populates='Rack')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Rack')
@@ -1183,7 +1305,7 @@ class ResourceExtension(Base):
     data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    templateId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    templateId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ResourceExtension')
     ObjectTemplate_: Mapped[Optional['ObjectTemplate']] = relationship('ObjectTemplate', back_populates='ResourceExtension')
@@ -1202,9 +1324,9 @@ class RouteTarget(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    vrfId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    vrfId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='RouteTarget')
     Vrf_: Mapped[Optional['Vrf']] = relationship('Vrf', back_populates='RouteTarget')
@@ -1238,10 +1360,10 @@ class VirtualMachine(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    clusterId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    clusterId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    description: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column('metadata', JSONB)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Cluster_: Mapped[Optional['Cluster']] = relationship('Cluster', back_populates='VirtualMachine')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='VirtualMachine')
@@ -1261,11 +1383,11 @@ class CircuitSegment(Base):
     status: Mapped[Circuitstatus] = mapped_column(Enum(Circuitstatus, values_callable=lambda cls: [member.value for member in cls], name='CircuitStatus'), nullable=False, server_default=text('\'PLANNED\'::"CircuitStatus"'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    providerId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    bandwidthMbps: Mapped[Optional[int]] = mapped_column(Integer)
-    aSideNotes: Mapped[Optional[str]] = mapped_column(Text)
-    zSideNotes: Mapped[Optional[str]] = mapped_column(Text)
+    label: Mapped[str | None] = mapped_column(Text)
+    providerId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    bandwidthMbps: Mapped[int | None] = mapped_column(Integer)
+    aSideNotes: Mapped[str | None] = mapped_column(Text)
+    zSideNotes: Mapped[str | None] = mapped_column(Text)
 
     Circuit_: Mapped['Circuit'] = relationship('Circuit', back_populates='CircuitSegment')
     Provider_: Mapped[Optional['Provider']] = relationship('Provider', back_populates='CircuitSegment')
@@ -1286,10 +1408,10 @@ class CircuitTermination(Base):
     side: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    locationId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    portName: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    locationId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    portName: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Circuit_: Mapped['Circuit'] = relationship('Circuit', back_populates='CircuitTermination')
     Location_: Mapped[Optional['Location']] = relationship('Location', back_populates='CircuitTermination')
@@ -1314,11 +1436,11 @@ class Device(Base):
     status: Mapped[Devicestatus] = mapped_column(Enum(Devicestatus, values_callable=lambda cls: [member.value for member in cls], name='DeviceStatus'), nullable=False, server_default=text('\'PLANNED\'::"DeviceStatus"'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    rackId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    serialNumber: Mapped[Optional[str]] = mapped_column(Text)
-    positionU: Mapped[Optional[int]] = mapped_column(Integer)
-    face: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    rackId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    serialNumber: Mapped[str | None] = mapped_column(Text)
+    positionU: Mapped[int | None] = mapped_column(Integer)
+    face: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     DeviceRole_: Mapped['DeviceRole'] = relationship('DeviceRole', back_populates='Device')
     DeviceType_: Mapped['DeviceType'] = relationship('DeviceType', back_populates='Device')
@@ -1357,11 +1479,11 @@ class PowerFeed(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    powerPanelId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    voltage: Mapped[Optional[int]] = mapped_column(Integer)
-    amperage: Mapped[Optional[int]] = mapped_column(Integer)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    powerPanelId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    voltage: Mapped[int | None] = mapped_column(Integer)
+    amperage: Mapped[int | None] = mapped_column(Integer)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='PowerFeed')
     PowerPanel_: Mapped[Optional['PowerPanel']] = relationship('PowerPanel', back_populates='PowerFeed')
@@ -1381,8 +1503,8 @@ class RackElevation(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    imageUrl: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    imageUrl: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='RackElevation')
     Rack_: Mapped['Rack'] = relationship('Rack', back_populates='RackElevation')
@@ -1402,10 +1524,10 @@ class RackReservation(Base):
     label: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    startsAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
-    endsAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    startsAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    endsAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='RackReservation')
     Rack_: Mapped['Rack'] = relationship('Rack', back_populates='RackReservation')
@@ -1423,8 +1545,8 @@ class ConsolePort(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    label: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='ConsolePort')
     ConsoleConnection: Mapped[list['ConsoleConnection']] = relationship('ConsoleConnection', back_populates='ConsolePort_')
@@ -1442,8 +1564,8 @@ class ConsoleServerPort(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    label: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='ConsoleServerPort')
     ConsoleConnection: Mapped[list['ConsoleConnection']] = relationship('ConsoleConnection', back_populates='ConsoleServerPort_')
@@ -1462,10 +1584,10 @@ class Controller(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deviceId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    role: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    deviceId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    role: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped[Optional['Device']] = relationship('Device', back_populates='Controller')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='Controller')
@@ -1484,8 +1606,8 @@ class DeviceBay(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    installedDeviceId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    installedDeviceId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped[Optional['Device']] = relationship('Device', foreign_keys=[installedDeviceId], back_populates='DeviceBay_installedDeviceId')
     Device1: Mapped['Device'] = relationship('Device', foreign_keys=[parentDeviceId], back_populates='DeviceBay_parentDeviceId')
@@ -1518,7 +1640,7 @@ class DeviceRedundancyGroupMember(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     groupId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     deviceId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    role: Mapped[Optional[str]] = mapped_column(Text)
+    role: Mapped[str | None] = mapped_column(Text)
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='DeviceRedundancyGroupMember')
     DeviceRedundancyGroup_: Mapped['DeviceRedundancyGroup'] = relationship('DeviceRedundancyGroup', back_populates='DeviceRedundancyGroupMember')
@@ -1534,13 +1656,13 @@ class FrontPort(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     deviceId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    moduleId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    moduleId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    type: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    label: Mapped[str | None] = mapped_column(Text)
+    type: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='FrontPort')
     Module_: Mapped[Optional['Module']] = relationship('Module', back_populates='FrontPort')
@@ -1560,9 +1682,9 @@ class Interface(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    macAddress: Mapped[Optional[str]] = mapped_column(Text)
-    mtu: Mapped[Optional[int]] = mapped_column(Integer)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    macAddress: Mapped[str | None] = mapped_column(Text)
+    mtu: Mapped[int | None] = mapped_column(Integer)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='Interface')
     Cable_interfaceAId: Mapped[list['Cable']] = relationship('Cable', foreign_keys='[Cable.interfaceAId]', back_populates='Interface_')
@@ -1584,11 +1706,11 @@ class InventoryItem(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    deviceId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    serial: Mapped[Optional[str]] = mapped_column(Text)
-    assetTag: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    deviceId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    serial: Mapped[str | None] = mapped_column(Text)
+    assetTag: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped[Optional['Device']] = relationship('Device', back_populates='InventoryItem')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='InventoryItem')
@@ -1608,11 +1730,11 @@ class Module(Base):
     organizationId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     deviceId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     moduleTypeId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    moduleBayId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    moduleBayId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    serial: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    serial: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='Module')
     ModuleType_: Mapped['ModuleType'] = relationship('ModuleType', back_populates='Module')
@@ -1639,13 +1761,13 @@ class ModuleBay(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
-    deviceId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    parentModuleId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    deviceId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    parentModuleId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    position: Mapped[Optional[int]] = mapped_column(Integer)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    position: Mapped[int | None] = mapped_column(Integer)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped[Optional['Device']] = relationship('Device', back_populates='ModuleBay')
     parentModule_: Mapped[Optional['Module']] = relationship(
@@ -1673,11 +1795,11 @@ class ObservedResourceState(Base):
     kind: Mapped[Observationkind] = mapped_column(Enum(Observationkind, values_callable=lambda cls: [member.value for member in cls], name='ObservationKind'), nullable=False)
     driftDetected: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('false'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    deviceId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    lastSeenAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
-    health: Mapped[Optional[str]] = mapped_column(Text)
-    payload: Mapped[Optional[dict]] = mapped_column(JSONB)
-    driftSummary: Mapped[Optional[str]] = mapped_column(Text)
+    deviceId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    lastSeenAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
+    health: Mapped[str | None] = mapped_column(Text)
+    payload: Mapped[dict | None] = mapped_column(JSONB)
+    driftSummary: Mapped[str | None] = mapped_column(Text)
 
     Device_: Mapped[Optional['Device']] = relationship('Device', back_populates='ObservedResourceState')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ObservedResourceState')
@@ -1695,8 +1817,8 @@ class PowerOutlet(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    label: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='PowerOutlet')
     PowerConnection: Mapped[list['PowerConnection']] = relationship('PowerConnection', back_populates='PowerOutlet_')
@@ -1714,8 +1836,8 @@ class PowerPort(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    label: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='PowerPort')
     PowerConnection: Mapped[list['PowerConnection']] = relationship('PowerConnection', back_populates='PowerPort_')
@@ -1733,9 +1855,9 @@ class RearPort(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    type: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    label: Mapped[str | None] = mapped_column(Text)
+    type: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='RearPort')
 
@@ -1771,9 +1893,9 @@ class VirtualDeviceContext(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    identifier: Mapped[Optional[str]] = mapped_column(Text)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    identifier: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Device_: Mapped['Device'] = relationship('Device', back_populates='VirtualDeviceContext')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='VirtualDeviceContext')
@@ -1792,8 +1914,8 @@ class Cable(Base):
     interfaceBId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    label: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    label: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Interface_: Mapped['Interface'] = relationship('Interface', foreign_keys=[interfaceAId], back_populates='Cable_interfaceAId')
     Interface1: Mapped['Interface'] = relationship('Interface', foreign_keys=[interfaceBId], back_populates='Cable_interfaceBId')
@@ -1814,8 +1936,8 @@ class ConsoleConnection(Base):
     clientPortId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    name: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    name: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     ConsolePort_: Mapped['ConsolePort'] = relationship('ConsolePort', back_populates='ConsoleConnection')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='ConsoleConnection')
@@ -1833,7 +1955,7 @@ class InterfaceRedundancyGroupMember(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     groupId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     interfaceId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    role: Mapped[Optional[str]] = mapped_column(Text)
+    role: Mapped[str | None] = mapped_column(Text)
 
     InterfaceRedundancyGroup_: Mapped['InterfaceRedundancyGroup'] = relationship('InterfaceRedundancyGroup', back_populates='InterfaceRedundancyGroupMember')
     Interface_: Mapped['Interface'] = relationship('Interface', back_populates='InterfaceRedundancyGroupMember')
@@ -1854,9 +1976,9 @@ class IpAddress(Base):
     address: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    interfaceId: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    description: Mapped[str | None] = mapped_column(Text)
+    interfaceId: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Interface_: Mapped[Optional['Interface']] = relationship('Interface', back_populates='IpAddress')
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='IpAddress')
@@ -1878,8 +2000,8 @@ class PowerConnection(Base):
     portId: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     createdAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     updatedAt: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(precision=3), nullable=False)
-    name: Mapped[Optional[str]] = mapped_column(Text)
-    deletedAt: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(precision=3))
+    name: Mapped[str | None] = mapped_column(Text)
+    deletedAt: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP(precision=3))
 
     Organization_: Mapped['Organization'] = relationship('Organization', back_populates='PowerConnection')
     PowerOutlet_: Mapped['PowerOutlet'] = relationship('PowerOutlet', back_populates='PowerConnection')

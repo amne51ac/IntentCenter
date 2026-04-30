@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from nims.config import get_settings
 
@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover
     InvalidToken = Exception  # type: ignore[assignment, misc]
 
 
-def _fernet() -> "Fernet":
+def _fernet() -> Fernet:
     if Fernet is None:  # pragma: no cover
         raise RuntimeError("cryptography package required for IdP secret storage in the database")
     settings = get_settings()
@@ -29,7 +29,7 @@ def encrypt_secret(plain: str) -> str:
     return _fernet().encrypt(plain.encode("utf-8")).decode("ascii")
 
 
-def decrypt_secret(token: str) -> Optional[str]:
+def decrypt_secret(token: str) -> str | None:
     try:
         r = _fernet().decrypt(token.encode("ascii"))
         return r.decode("utf-8")
@@ -45,7 +45,7 @@ def pack_encrypted(plain: str) -> str:
     return PREFIX + encrypt_secret(plain)
 
 
-def unpack_encrypted(stored: str | None) -> Optional[str]:
+def unpack_encrypted(stored: str | None) -> str | None:
     if not stored or not isinstance(stored, str):
         return None
     if not stored.startswith(PREFIX):

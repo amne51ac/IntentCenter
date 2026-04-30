@@ -229,5 +229,50 @@ def serialize_audit_event(row: Any) -> dict[str, Any]:
     return columns_dict(row)
 
 
+def _plugin_contributions_from_manifest(manifest: Any) -> dict[str, Any]:
+    """Shape matches design doc: optional widgets, connectors, routes, jobs in a plugin manifest JSON."""
+    m: dict[str, Any] = manifest if isinstance(manifest, dict) else {}
+    widgets: list[str] = []
+    w = m.get("widgets")
+    if isinstance(w, list):
+        for x in w:
+            if isinstance(x, str):
+                widgets.append(x)
+            elif isinstance(x, dict) and x.get("key") is not None:
+                widgets.append(str(x["key"]))
+    if not widgets and isinstance(m.get("panels"), list):
+        widgets = [str(x) for x in m["panels"]]
+    conn_list: list[str] = []
+    connectors = m.get("connectors")
+    if isinstance(connectors, list):
+        for x in connectors:
+            if isinstance(x, str):
+                conn_list.append(x)
+            elif isinstance(x, dict) and x.get("type") is not None:
+                conn_list.append(str(x["type"]))
+    route_n = len(m["routes"]) if isinstance(m.get("routes"), list) else 0
+    job_keys: list[str] = []
+    jobs = m.get("jobs")
+    if isinstance(jobs, list):
+        for x in jobs:
+            if isinstance(x, str):
+                job_keys.append(x)
+            elif isinstance(x, dict) and x.get("key") is not None:
+                job_keys.append(str(x["key"]))
+    return {
+        "summary": {
+            "widgetCount": len(widgets),
+            "connectorTypeCount": len(conn_list),
+            "routeCount": route_n,
+            "jobKeyCount": len(job_keys),
+        },
+        "widgetKeys": widgets,
+        "connectorTypes": conn_list,
+        "jobKeys": job_keys,
+    }
+
+
 def serialize_plugin(row: Any) -> dict[str, Any]:
-    return columns_dict(row)
+    out = columns_dict(row)
+    out["contributions"] = _plugin_contributions_from_manifest(row.manifest)
+    return out

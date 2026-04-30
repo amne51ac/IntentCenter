@@ -3,8 +3,19 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useId, useMemo } from "react";
 import { apiJson } from "../../api/client";
 import { InlineLoader } from "../../components/Loader";
+import { ExtensionDebug } from "../../extensibility/ExtensionDebug";
+import { PageContextProvider, type PageContextValue } from "../../extensibility/PageContext";
+import { PAGE_IDS } from "../../extensibility/pageIds";
+import { Slot, useSlotHasPlacements } from "../../extensibility/Slot";
 import { objectEditHref, objectViewHref, resourceTypeForApi } from "../../lib/objectLinks";
 import { LocationMap, rowToMapPoint } from "../../components/LocationMap";
+
+type MeForContext = {
+  organization: { id: string; name: string; slug: string };
+  auth:
+    | { mode: "user"; user: { id: string; role: string } }
+    | { mode: "api_token"; token: { id: string; role: string } };
+};
 
 type Node = { resourceType: string; id: string; label: string; meta?: Record<string, unknown> };
 type Edge = {
@@ -192,7 +203,7 @@ function RelationshipDiagram({
     let idx = 0;
     while (idx < others.length) {
       const rem = others.length - idx;
-      let k = maxSatellitesThatFitRing(ringR, rem);
+      const k = maxSatellitesThatFitRing(ringR, rem);
       if (k === 0) {
         ringR += 14;
         continue;
@@ -669,12 +680,59 @@ export function ObjectViewPage() {
   const rtApi = resourceTypeForApi(decodeURIComponent(resourceType));
   const id = decodeURIComponent(resourceId);
 
+  const meQ = useQuery({
+    queryKey: ["me"],
+    queryFn: () => apiJson<MeForContext>("/v1/me"),
+  });
+
   const q = useQuery({
     queryKey: ["resource-view", rtApi, id],
     queryFn: () =>
       apiJson<ResourceViewPayload>(`/v1/resource-view/${encodeURIComponent(rtApi)}/${encodeURIComponent(id)}`),
     enabled: Boolean(resourceType && resourceId),
   });
+
+  const pageContext: PageContextValue = useMemo(() => {
+    const item = (q.data?.item ?? null) as Record<string, unknown> | null;
+    const nameFromItem =
+      item && typeof item.name === "string"
+        ? item.name
+        : item && typeof item.label === "string"
+          ? item.label
+          : item && typeof item.cid === "string"
+            ? item.cid
+            : null;
+    const resource: Record<string, unknown> | null = id
+      ? nameFromItem
+        ? { id, name: nameFromItem, resourceType: rtApi }
+        : { id, resourceType: rtApi }
+      : null;
+    const m = meQ.data;
+    const u = m
+      ? m.auth.mode === "user"
+        ? { id: m.auth.user.id, role: m.auth.user.role }
+        : { id: m.auth.token.id, role: m.auth.token.role }
+      : null;
+    return {
+      pageId: PAGE_IDS.inventoryObjectView,
+      page: {
+        pageId: PAGE_IDS.inventoryObjectView,
+        params: { resourceType: rtApi, resourceId: id },
+        resourceType: rtApi,
+        resourceId: id,
+      },
+      resource,
+      user: u,
+      organization: m?.organization ?? null,
+    };
+  }, [q.data, id, rtApi, meQ.data]);
+
+  const { has: hasAside, loading: placementsLoading } = useSlotHasPlacements(
+    PAGE_IDS.inventoryObjectView,
+    "content.aside",
+    rtApi,
+  );
+  const showAside = hasAside && !placementsLoading;
 
   const title =
     (q.data?.item?.name as string | undefined) ||
@@ -687,29 +745,33 @@ export function ObjectViewPage() {
   const editTo = objectEditHref(rtApi, id);
 
   return (
-    <div className="main-page">
-      <header className="main-header">
-        <div className="page-title-block">
-          <p className="header-meta">
-            <span className="badge">{rtApi}</span>
-            <span className="mono header-meta-id">{id}</span>
-          </p>
-          <h2 className="page-title">{title}</h2>
-          <p className="page-subtitle page-subtitle--flush">
-            <Link to="/" className="form-back-link">
-              ← Home
-            </Link>
-          </p>
-        </div>
-        <div className="main-header-actions">
-          {editTo ? (
-            <Link to={editTo} className="btn btn-primary">
-              Edit
-            </Link>
-          ) : null}
-        </div>
-      </header>
-      <div className="main-body">
+    <PageContextProvider value={pageContext}>
+      <div className="main-page">
+        <header className="main-header">
+          <div className="page-title-block">
+            <p className="header-meta">
+              <span className="badge">{rtApi}</span>
+              <span className="mono header-meta-id">{id}</span>
+            </p>
+            <h2 className="page-title">{title}</h2>
+            <p className="page-subtitle page-subtitle--flush">
+              <Link to="/" className="form-back-link">
+                ← Home
+              </Link>
+            </p>
+          </div>
+          <div className="main-header-actions main-header-actions--with-slots">
+            {editTo ? (
+              <Link to={editTo} className="btn btn-primary">
+                Edit
+              </Link>
+            ) : null}
+            <Slot name="toolbar.secondary" pageId={PAGE_IDS.inventoryObjectView} resourceType={rtApi} />
+          </div>
+        </header>
+        <div className={showAside ? "main-body main-body--object-with-aside" : "main-body"}>
+          <div className="object-view-columns">
+            <div className="object-view-primary">
         {q.isLoading ? <InlineLoader label="Loading object…" /> : null}
         {q.error ? <div className="error-banner">{String(q.error)}</div> : null}
         {q.data ? (
@@ -842,9 +904,22 @@ export function ObjectViewPage() {
                 <p className="muted">No relationship graph could be loaded (the object may be missing or not visible).</p>
               </section>
             )}
+            <ExtensionDebug pageId={PAGE_IDS.inventoryObjectView} resourceType={rtApi} />
           </>
         ) : null}
+            </div>
+            {showAside ? (
+              <aside className="object-view-aside" aria-label="Plugin extensions">
+                <Slot
+                  name="content.aside"
+                  pageId={PAGE_IDS.inventoryObjectView}
+                  resourceType={rtApi}
+                />
+              </aside>
+            ) : null}
+          </div>
+        </div>
       </div>
-    </div>
+    </PageContextProvider>
   );
 }

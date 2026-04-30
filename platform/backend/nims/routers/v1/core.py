@@ -289,8 +289,16 @@ def get_plugins(
     db: Session = Depends(get_db),
     auth: Annotated[AuthContext | None, Depends(get_auth)] = None,
 ) -> dict[str, list[dict[str, object]]]:
-    require_auth_ctx(auth)
-    items = db.execute(select(PluginRegistration).order_by(PluginRegistration.packageName.asc())).scalars().all()
+    ctx = require_auth_ctx(auth)
+    items = (
+        db.execute(
+            select(PluginRegistration)
+            .where(PluginRegistration.organizationId == ctx.organization.id)
+            .order_by(PluginRegistration.packageName.asc())
+        )
+        .scalars()
+        .all()
+    )
     return {"items": [serialize_plugin(p) for p in items]}
 
 

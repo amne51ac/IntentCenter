@@ -7,6 +7,7 @@ const LINKS: { to: string; label: string; end: boolean }[] = [
   { to: "/platform/admin/audit", label: "Audit log", end: true },
   { to: "/platform/admin/docs", label: "Docs & API", end: true },
   { to: "/platform/admin/health", label: "Service health", end: true },
+  { to: "/platform/admin/extensions", label: "Plugins & extensions", end: true },
 ];
 
 function linkClass(active: boolean) {

@@ -9,7 +9,14 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from nims.auth_context import AuthContext, auth_actor_from_context, require_write
 from nims.crypto_util import new_correlation_id
 from nims.deps import get_auth, get_db, require_auth_ctx
-from nims.models_generated import Circuit, CircuitDiversityGroup, CircuitSegment, Circuitstatus, CircuitTermination, Provider
+from nims.models_generated import (
+    Circuit,
+    CircuitDiversityGroup,
+    CircuitSegment,
+    Circuitstatus,
+    CircuitTermination,
+    Provider,
+)
 from nims.serialize import columns_dict, serialize_circuit, serialize_circuit_segment, serialize_provider
 from nims.services.audit import record_audit
 from nims.services.webhooks import dispatch_webhooks

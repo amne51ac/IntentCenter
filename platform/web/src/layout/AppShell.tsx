@@ -69,8 +69,8 @@ export function AppShell() {
               src={publicAssetUrl("intentcenter-logo.svg")}
               alt="IntentCenter"
               className="sidebar-wordmark"
-              width={350}
-              height={70}
+              width={420}
+              height={84}
             />
           </NavLink>
           <p className="brand-tagline">Network source of truth — intent & inventory</p>
@@ -107,6 +107,16 @@ export function AppShell() {
         </div>
 
         <nav className="sidebar-nav-scroll">
+          <div className="nav-section" data-nav-section="overview">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
+              title="Overview"
+            >
+              Overview
+            </NavLink>
+          </div>
           {SIDEBAR_NAV.map((section) => (
             <CollapsibleNavSection
               key={section.id}

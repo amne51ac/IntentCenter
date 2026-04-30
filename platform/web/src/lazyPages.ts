@@ -29,6 +29,9 @@ export const AuditPage = lazy(() => import("./pages/platform/Audit").then((m) =>
 export const ApiTokensPage = lazy(() => import("./pages/platform/ApiTokensPage").then((m) => ({ default: m.ApiTokensPage })));
 export const AdminDocsPage = lazy(() => import("./pages/platform/AdminDocsPage").then((m) => ({ default: m.AdminDocsPage })));
 export const AdminHealthPage = lazy(() => import("./pages/platform/AdminHealthPage").then((m) => ({ default: m.AdminHealthPage })));
+export const PluginExtensionsPage = lazy(() =>
+  import("./pages/platform/PluginExtensionsPage").then((m) => ({ default: m.PluginExtensionsPage })),
+);
 export const IdentityPage = lazy(() => import("./pages/platform/IdentityPage").then((m) => ({ default: m.IdentityPage })));
 export const ObjectTemplatesPage = lazy(() => import("./pages/platform/ObjectTemplates").then((m) => ({ default: m.ObjectTemplatesPage })));
 export const JobFormPage = lazy(() => import("./pages/platform/JobFormPage").then((m) => ({ default: m.JobFormPage })));

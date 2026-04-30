@@ -22,6 +22,7 @@ from nims.models_generated import (
     Circuitstatus,
     CircuitTermination,
     CircuitType,
+    ConnectorRegistration,
     Device,
     DeviceRole,
     Devicestatus,
@@ -36,6 +37,7 @@ from nims.models_generated import (
     Manufacturer,
     ObjectTemplate,
     Organization,
+    PluginPlacement,
     PluginRegistration,
     Prefix,
     Project,
@@ -674,23 +676,112 @@ def run_seed(session: Session) -> tuple[Organization, str, str, str, str]:
             ),
         )
 
+    j_sync = session.execute(
+        select(JobDefinition).where(JobDefinition.organizationId == org.id, JobDefinition.key == "connector.sync")
+    ).scalar_one_or_none()
+    if j_sync is None:
+        session.add(
+            JobDefinition(
+                id=uuid.uuid4(),
+                organizationId=org.id,
+                key="connector.sync",
+                name="Connector sync",
+                description="Run sync for a connector (input { connectorId }).",
+                requiresApproval=False,
+                updatedAt=now,
+            ),
+        )
+
     plug = session.execute(
-        select(PluginRegistration).where(PluginRegistration.packageName == "nims.builtin.reporting"),
+        select(PluginRegistration).where(
+            PluginRegistration.organizationId == org.id,
+            PluginRegistration.packageName == "nims.builtin.reporting",
+        ),
     ).scalar_one_or_none()
     if plug is None:
         session.add(
             PluginRegistration(
                 id=uuid.uuid4(),
+                organizationId=org.id,
                 packageName="nims.builtin.reporting",
                 version="0.1.0",
                 enabled=True,
-                manifest={"panels": ["inventory-summary"]},
+                manifest={
+                    "version": 1,
+                    "widgets": [
+                        "inventory-summary",
+                        {"key": "builtin.objectContext", "pageId": "inventory.objectView", "slot": "content.aside"},
+                    ],
+                    "panels": ["inventory-summary"],
+                },
             ),
         )
     else:
         plug.version = "0.1.0"
         plug.enabled = True
-        plug.manifest = {"panels": ["inventory-summary"]}
+        plug.manifest = {
+            "version": 1,
+            "widgets": [
+                "inventory-summary",
+                {"key": "builtin.objectContext", "pageId": "inventory.objectView", "slot": "content.aside"},
+            ],
+            "panels": ["inventory-summary"],
+        }
+    session.flush()
+    plug = session.execute(
+        select(PluginRegistration).where(
+            PluginRegistration.organizationId == org.id,
+            PluginRegistration.packageName == "nims.builtin.reporting",
+        )
+    ).scalar_one()
+    demo_slot = session.execute(
+        select(PluginPlacement).where(
+            PluginPlacement.organizationId == org.id,
+            PluginPlacement.widgetKey == "builtin.objectContext",
+        )
+    ).scalar_one_or_none()
+    if demo_slot is None:
+        session.add(
+            PluginPlacement(
+                id=uuid.uuid4(),
+                organizationId=org.id,
+                pluginRegistrationId=plug.id,
+                pageId="inventory.objectView",
+                slot="content.aside",
+                widgetKey="builtin.objectContext",
+                priority=0,
+                enabled=True,
+                filters=None,
+                macroBindings={
+                    "label": "Context",
+                    "name": "{{ resource.name }}",
+                    "typeLine": "{{ page.resourceType }}",
+                    "idLine": "{{ page.resourceId }}",
+                },
+                requiredPermissions=["READ"],
+                updatedAt=now,
+            )
+        )
+
+    demo_conn = session.execute(
+        select(ConnectorRegistration).where(
+            ConnectorRegistration.organizationId == org.id,
+            ConnectorRegistration.name == "demo-http-probe",
+        )
+    ).scalar_one_or_none()
+    if demo_conn is None:
+        session.add(
+            ConnectorRegistration(
+                id=uuid.uuid4(),
+                organizationId=org.id,
+                pluginRegistrationId=plug.id,
+                type="http_get",
+                name="demo-http-probe",
+                enabled=True,
+                settings={"url": "https://example.com", "description": "Seed HTTP GET; safe public URL for demos"},
+                updatedAt=now,
+            )
+        )
 
     admin_raw = generate_raw_token()
     write_raw = generate_raw_token()

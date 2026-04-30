@@ -26,6 +26,7 @@ from nims.serialize import (
     serialize_service_instance,
 )
 from nims.services.audit import record_audit
+from nims.services.job_runner import execute_job
 from nims.timeutil import utc_now
 
 router = APIRouter(tags=["automation"])
@@ -225,8 +226,15 @@ def run_job(
 
     if not defn.requiresApproval:
         run.status = Jobrunstatus.RUNNING
-        run.logs = "Simulated worker: job executed (placeholder)."
-        run.output = to_input_json({"ok": True, "message": "No-op automation hook; connect workers in Phase 2."})
+        run.updatedAt = utc_now()
+        db.flush()
+        output, log_line = execute_job(db, ctx.organization.id, defn.key, run, defn)
+        run.output = to_input_json(output)
+        run.logs = log_line
+        if output.get("ok") is False:
+            run.status = Jobrunstatus.FAILED
+        else:
+            run.status = Jobrunstatus.SUCCEEDED
         run.updatedAt = utc_now()
         db.flush()
         record_audit(

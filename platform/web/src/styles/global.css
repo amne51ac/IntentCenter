@@ -15,15 +15,15 @@
   --danger: #f07178;
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --sidebar-w: 15.5rem;
+  --sidebar-w: 18rem;
   --radius: 6px;
   --title-page: 1.375rem;
   --title-page-weight: 650;
   --title-page-tracking: -0.02em;
   --subtitle-page: 0.9rem;
   /* Align `.sidebar-brand` border with `.main-header` border across columns */
-  --app-chrome-header-pad-y: 1rem;
-  --app-chrome-header-min-h: 5.5rem;
+  --app-chrome-header-pad-y: 0.5rem;
+  --app-chrome-header-min-h: 7.5rem;
 }
 
 *,
@@ -86,14 +86,18 @@ a:hover {
   flex-shrink: 0;
   box-sizing: border-box;
   min-height: var(--app-chrome-header-min-h);
-  padding: var(--app-chrome-header-pad-y) 1.1rem;
+  padding: var(--app-chrome-header-pad-y) 0.75rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.sidebar-brand .brand-tagline {
+  margin-top: 0.35rem;
 }
 
 .sidebar .sidebar-brand-link {
@@ -119,7 +123,7 @@ a:hover {
 
 .sidebar-wordmark {
   display: block;
-  height: 3.5rem;
+  height: 5.25rem;
   width: auto;
   max-width: 100%;
   margin: 0 auto;
@@ -284,6 +288,14 @@ a:hover {
   max-width: 52rem;
   flex-shrink: 0;
   padding-top: 0.2rem;
+}
+
+.main-header-actions--with-slots {
+  max-width: none;
+}
+
+.ext-slot {
+  min-width: 0;
 }
 
 .main-body {
@@ -1301,6 +1313,31 @@ tr.data-row-clickable:hover td {
   color: var(--text-heading);
 }
 
+/* Admin — Plugins & extensions */
+.plugin-extensions-page .plugin-extensions-lede {
+  max-width: 48rem;
+  margin-bottom: 1.5rem;
+}
+.plugin-extensions-page .plugin-extensions-lede p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.plugin-extensions-form-panel {
+  max-width: 40rem;
+  padding: 1rem 1.1rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.plugin-extensions-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
 .graph-tree-wrap {
   padding: 0.75rem 1rem;
   border: 1px solid var(--border);
@@ -1382,6 +1419,86 @@ tr.data-row-clickable:hover td {
 }
 
 /* Object view (detail + relationship map) */
+/* Object view: main column + optional plugin extension aside (see .main-body--object-with-aside @ media) */
+.object-view-columns {
+  display: block;
+  min-width: 0;
+}
+
+.object-view-primary {
+  min-width: 0;
+}
+
+.object-view-aside {
+  min-width: 0;
+  align-self: start;
+}
+
+.ext-widget--objectContext {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.ext-widget-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.ext-debug {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.2);
+}
+.ext-debug-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+.ext-debug-hint {
+  font-size: 0.8rem;
+  margin: 0 0 0.75rem;
+}
+.ext-debug-block h5 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ext-debug-pre {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.72rem;
+  max-height: 12rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+@media (min-width: 64rem) {
+  .main-body--object-with-aside .object-view-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(14.5rem, 20rem);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .object-view-aside {
+    position: sticky;
+    top: 0.5rem;
+  }
+}
+
 .object-view-details {
   margin: 0;
   padding: 0.75rem 1rem;
